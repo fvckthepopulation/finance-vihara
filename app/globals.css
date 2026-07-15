@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+:root {
+  /* Surface — beige */
+  --km-bg: #F4F2EE;
+  --km-panel: #FFFFFF;
+  --km-panel-soft: #F8F6F1;
+  --km-border: #D8D5CC;
+  --km-border-strong: #B5B2A6;
+
+  /* Text */
+  --km-ink: #1A1916;
+  --km-ink-soft: #5F5E5A;
+  --km-ink-muted: #888780;
+
+  /* Brand / primary — brown */
+  --km-accent: #7B4F2C;
+  --km-accent-deep: #5C3A1E;
+  --km-accent-soft: #F0E7DE;
+  --km-accent-ink: #4A2F1A;
+
+  /* Green — positive / income */
+  --km-green: #1A6B4A;
+  --km-green-soft: #E3F0E9;
+  --km-green-ink: #114730;
+
+  /* Blue — info chips */
+  --km-blue: #1A4A7A;
+  --km-blue-soft: #E6EEF6;
+  --km-blue-ink: #123354;
+
+  /* Teal — legacy alias, follows green family */
+  --km-teal: #1A6B4A;
+  --km-teal-soft: #E3F0E9;
+  --km-teal-ink: #114730;
+
+  --km-amber: #B97514;
+  --km-amber-soft: #F7EDDD;
+  --km-amber-ink: #854F0B;
+  --km-amber-deep: #B97514;
+  --km-amber-label: #854F0B;
+
+  --km-gold: #B8860B;
+
+  /* Red — expense / negative */
+  --km-red: #A32D2D;
+  --km-red-soft: #FCEBEB;
+  --km-red-ink: #791F1F;
+
+  --km-purple: #5B3E8C;
+  --km-purple-soft: #EFEAF7;
+
+  /* Radius */
+  --km-radius: 8px;
+  --km-radius-lg: 12px;
+}
+
+@theme inline {
+  --color-km-bg: var(--km-bg);
+  --color-km-panel: var(--km-panel);
+  --color-km-panel-soft: var(--km-panel-soft);
+  --color-km-border: var(--km-border);
+  --color-km-border-strong: var(--km-border-strong);
+  --color-km-ink: var(--km-ink);
+  --color-km-ink-soft: var(--km-ink-soft);
+  --color-km-ink-muted: var(--km-ink-muted);
+  --color-km-accent: var(--km-accent);
+  --color-km-accent-deep: var(--km-accent-deep);
+  --color-km-accent-soft: var(--km-accent-soft);
+  --color-km-accent-ink: var(--km-accent-ink);
+  --color-km-green: var(--km-green);
+  --color-km-green-soft: var(--km-green-soft);
+  --color-km-green-ink: var(--km-green-ink);
+  --color-km-blue: var(--km-blue);
+  --color-km-blue-soft: var(--km-blue-soft);
+  --color-km-blue-ink: var(--km-blue-ink);
+  --color-km-teal: var(--km-teal);
+  --color-km-teal-soft: var(--km-teal-soft);
+  --color-km-teal-ink: var(--km-teal-ink);
+  --color-km-amber: var(--km-amber);
+  --color-km-amber-soft: var(--km-amber-soft);
+  --color-km-amber-ink: var(--km-amber-ink);
+  --color-km-amber-deep: var(--km-amber-deep);
+  --color-km-gold: var(--km-gold);
+  --color-km-red: var(--km-red);
+  --color-km-red-soft: var(--km-red-soft);
+  --color-km-red-ink: var(--km-red-ink);
+  --color-km-purple: var(--km-purple);
+  --color-km-purple-soft: var(--km-purple-soft);
+
+  /* Monospace (font-mono) — DM Mono via next/font; angka, kode akun, nomor rekening */
+  --font-mono: var(--font-dm-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html, body {
+  background: var(--km-bg);
+  color: var(--km-ink);
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--km-accent);
+  box-shadow: 0 0 0 2px rgba(123, 79, 44, .12);
+}
+
+@media (max-width: 768px) {
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
