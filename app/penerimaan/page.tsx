@@ -77,7 +77,9 @@ export default function PenerimaanPage() {
       .catch(() => setBankAccounts([]));
   }, [viharaId, viharaReady]);
 
-  // Cascade: kategori → daftar nama penerimaan.
+  // Cascade: kategori → daftar nama penerimaan. Vihara ikut dikirim supaya
+  // item khusus satu vihara tidak terbawa ke vihara lain; di halaman ini
+  // vihara transaksi masih berasal dari pemilih di header.
   useEffect(() => {
     setName("");
     if (!category) {
@@ -86,7 +88,7 @@ export default function PenerimaanPage() {
     }
     let alive = true;
     setNamesLoading(true);
-    listTransactionNames({ type: "penerimaan", category })
+    listTransactionNames({ type: "penerimaan", category, vihara_id: viharaId })
       .then((list) => {
         if (alive) setNames(list);
       })
@@ -99,7 +101,7 @@ export default function PenerimaanPage() {
     return () => {
       alive = false;
     };
-  }, [category]);
+  }, [category, viharaId]);
 
   const reloadToday = useCallback(() => {
     if (!viharaReady) return;

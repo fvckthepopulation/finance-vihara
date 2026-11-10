@@ -22,6 +22,13 @@ export type TransactionRow = {
   counterparty: string | null;
   description: string | null;
   vihara_id: number | null;
+  /** Nama vihara pemilik baris — untuk tabel lintas-vihara. */
+  vihara_name?: string | null;
+  /** Rekening sumber/tujuan; `bank_label` sudah siap tampil ("BCA 6280-…"). */
+  bank_account_id?: number | null;
+  bank_label?: string | null;
+  /** Ada lampiran bukti (kuitansi/invoice) yang bisa dibuka. */
+  has_attachment?: boolean;
   /**
    * Referensi eksternal — untuk `source: "km"` berisi ref donasi KalyanaMitta
    * (dipakai link drill-down "KM ↗"). Opsional: backend pra-Phase 7 belum
@@ -79,6 +86,23 @@ export function listTransactions(
 }
 
 /** Unduh CSV riwayat transaksi dengan filter yang sama seperti daftar. */
+/**
+ * Ambil lampiran bukti sebuah baris transaksi. Endpointnya berbeda per tipe,
+ * dan dua-duanya dijaga hirarki vihara di server — berkasnya tidak duduk di
+ * folder publik, jadi tidak bisa dibuka dengan <a href> polos.
+ */
+export async function fetchTransactionAttachment(
+  row: Pick<TransactionRow, "id" | "tipe">,
+): Promise<Blob> {
+  const modul = row.tipe === "Pengeluaran" ? "pembayaran" : "penerimaan";
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_URL}/api/${modul}/${row.id}/attachment`, { headers });
+  if (!res.ok) throw new Error(`Gagal membuka lampiran (HTTP ${res.status})`);
+  return res.blob();
+}
+
 export async function exportTransactionsCsv(
   params: ListTransactionsParams = {},
 ): Promise<Blob> {

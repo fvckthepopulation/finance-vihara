@@ -1,4 +1,4 @@
-import { api, Paginated } from "./api";
+import { api, API_URL, getToken, Paginated } from "./api";
 
 export type PembayaranMethod = "transfer" | "tunai" | "auto_debit";
 
@@ -138,6 +138,50 @@ export type CreatePembayaranInput = {
 
 export async function createPembayaran(input: CreatePembayaranInput): Promise<Pembayaran> {
   return api<Pembayaran>(`/api/pembayaran`, { method: "POST", body: JSON.stringify(input) });
+}
+
+/**
+ * Unggah lampiran bukti (kuitansi / invoice). API menerima pdf/jpg/png,
+ * maksimal 10 MB, dan menyimpannya di disk privat — bukan folder publik —
+ * sehingga hanya bisa diambil lewat endpoint unduh yang dijaga hirarki.
+ */
+export async function uploadPembayaranAttachment(
+  id: number,
+  file: File,
+): Promise<Pembayaran> {
+  const body = new FormData();
+  body.append("file", file);
+  const headers = new Headers({ Accept: "application/json" });
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  // Sengaja tidak lewat api(): Content-Type harus dibiarkan diisi browser
+  // agar boundary multipart-nya benar.
+  const res = await fetch(`${API_URL}/api/pembayaran/${id}/attachment`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!res.ok) {
+    let pesan = `Gagal mengunggah lampiran (HTTP ${res.status})`;
+    try {
+      const payload = (await res.json()) as { message?: string };
+      if (payload.message) pesan = payload.message;
+    } catch {
+      /* biarkan pesan bawaan */
+    }
+    throw new Error(pesan);
+  }
+  return (await res.json()) as Pembayaran;
+}
+
+/** Ambil lampiran sebagai Blob — perlu token, jadi tidak bisa <a href> polos. */
+export async function fetchPembayaranAttachment(id: number): Promise<Blob> {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`${API_URL}/api/pembayaran/${id}/attachment`, { headers });
+  if (!res.ok) throw new Error(`Gagal membuka lampiran (HTTP ${res.status})`);
+  return res.blob();
 }
 
 export async function postPembayaran(id: number): Promise<Pembayaran> {

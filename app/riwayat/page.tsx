@@ -9,8 +9,10 @@ import { KmLink } from "@/components/KmLink";
 import { Pagination } from "@/components/Pagination";
 import {
   exportTransactionsCsv,
+  fetchTransactionAttachment,
   listTransactions,
   ListTransactionsParams,
+  TransactionRow,
   TransactionSource,
   TransactionStatus,
   TransactionTipe,
@@ -266,18 +268,19 @@ export default function RiwayatPage() {
                 <Th>Kategori</Th>
                 <Th className="text-right">Jumlah</Th>
                 <Th>Status</Th>
+                <Th>Bukti</Th>
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={7} className="px-3 py-10 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-10 text-center">
+                  <td colSpan={7} className="px-3 py-10 text-center">
                     <p className="text-[13px] font-medium text-km-ink-soft">
                       Tidak ada transaksi
                     </p>
@@ -332,6 +335,9 @@ export default function RiwayatPage() {
                         </span>
                       )}
                     </Td>
+                    <Td>
+                      <BuktiLink row={r} onError={setError} />
+                    </Td>
                   </tr>
                 ))
               )}
@@ -380,4 +386,54 @@ function Th({ children, className = "" }: { children?: React.ReactNode; classNam
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <td className={`px-3 py-2.5 align-middle text-km-ink ${className}`}>{children}</td>;
+}
+
+/**
+ * Pembuka lampiran bukti. Berkasnya duduk di disk privat dan endpoint
+ * unduhnya butuh token, jadi tidak bisa jadi <a href> biasa: diambil dulu
+ * sebagai blob, baru dibuka di tab baru. URL objeknya dicabut setelah
+ * sebentar supaya tidak menumpuk di memori.
+ */
+function BuktiLink({
+  row,
+  onError,
+}: {
+  row: TransactionRow;
+  onError: (pesan: string) => void;
+}) {
+  const [pending, setPending] = useState(false);
+
+  if (!row.has_attachment) {
+    return <span className="text-[11px] text-km-ink-muted">—</span>;
+  }
+
+  async function buka() {
+    setPending(true);
+    try {
+      const blob = await fetchTransactionAttachment(row);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Gagal membuka lampiran");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={buka}
+      disabled={pending}
+      data-testid={`bukti-${row.tipe}-${row.id}`}
+      className="inline-flex items-center gap-1 rounded-md border border-km-border px-1.5 py-0.5 text-[11px] text-km-blue hover:bg-km-panel-soft disabled:opacity-60"
+    >
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3 w-3">
+        <path d="M9 2H4v12h8V5L9 2z" />
+        <path d="M9 2v3h3" />
+      </svg>
+      {pending ? "Membuka…" : "Lihat"}
+    </button>
+  );
 }
