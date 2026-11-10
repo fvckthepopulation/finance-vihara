@@ -25,6 +25,10 @@ export type AdminRole = {
   users_count: number;
   permissions: string[];
   is_protected: boolean;
+  /** Role bawaan RbacSeeder — dibuat ulang tiap seeding, jadi tak bisa dihapus. */
+  is_builtin?: boolean;
+  /** Dihitung server: bukan bawaan DAN belum dipakai pengguna mana pun. */
+  can_delete?: boolean;
   description?: string | null;
   /** Anjuran scope untuk role ini — bukan penegakan. */
   default_scope?: ScopeType;
@@ -78,6 +82,9 @@ export const updateRolePermissions = (id: number, permissions: string[]) =>
     `/api/admin/roles/${id}`,
     { method: "PATCH", body: JSON.stringify({ permissions }) },
   );
+
+export const deleteRole = (id: number) =>
+  api<{ message: string }>(`/api/admin/roles/${id}`, { method: "DELETE" });
 
 export const createRole = (name: string, permissions: string[]) =>
   api<{ id: number; name: string; permissions: string[] }>(`/api/admin/roles`, {
