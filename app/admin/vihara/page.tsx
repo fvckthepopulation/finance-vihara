@@ -5,7 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { Field, Input, Textarea } from "@/components/Field";
+import { Field, Input, Select, Textarea } from "@/components/Field";
 import { Toast } from "@/components/Toast";
 import {
   createViharaBankAccount,
@@ -31,6 +31,7 @@ import {
   ViharaInput,
 } from "@/lib/vihara";
 import { useAuth } from "@/lib/useAuth";
+import { MasterEntity, listEntities } from "@/lib/masters";
 
 export default function AdminViharaPage() {
   const { can } = useAuth();
@@ -522,6 +523,11 @@ function PicSection({
 }
 
 function ViharaForm({ item, onClose, onSaved }: { item: Vihara | null; onClose: () => void; onSaved: () => void }) {
+  const { user } = useAuth();
+  const [entities, setEntities] = useState<MasterEntity[]>([]);
+  // Vihara selalu bernaung di bawah satu yayasan. Admin tingkat yayasan
+  // hanya melihat yayasannya sendiri (API yang membatasi daftarnya).
+  const [entityId, setEntityId] = useState<number | null>(item?.entity_id ?? null);
   const [name, setName] = useState(item?.name ?? "");
   const [address, setAddress] = useState(item?.address ?? "");
   const [contactPic, setContactPic] = useState(item?.contact_pic ?? "");
@@ -535,11 +541,22 @@ function ViharaForm({ item, onClose, onSaved }: { item: Vihara | null; onClose: 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    listEntities({ active: true })
+      .then((list) => {
+        setEntities(list);
+        if (entityId == null && list.length > 0) setEntityId(list[0].id);
+      })
+      .catch(() => setEntities([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
     const payload: ViharaInput = {
+      entity_id: entityId,
       name,
       address: address || null,
       contact_pic: contactPic || null,
@@ -573,6 +590,27 @@ function ViharaForm({ item, onClose, onSaved }: { item: Vihara | null; onClose: 
         </div>
 
         <div className="space-y-3 px-4 py-4">
+          <Field label="Yayasan penaung">
+            <Select
+              data-testid="vihara-entity"
+              required
+              value={entityId ?? ""}
+              onChange={(e) => setEntityId(e.target.value ? Number(e.target.value) : null)}
+              disabled={!!item && !(user?.scope_type === "global")}
+            >
+              <option value="">— pilih yayasan —</option>
+              {entities.map((en) => (
+                <option key={en.id} value={en.id}>
+                  {en.code} — {en.legal_name}
+                </option>
+              ))}
+            </Select>
+            {user?.scope_type !== "global" && (
+              <p className="mt-1 text-[11px] text-km-ink-muted">
+                Hanya admin tingkat global yang bisa memindahkan vihara antar yayasan.
+              </p>
+            )}
+          </Field>
           <Field label="Nama vihara">
             <Input required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>

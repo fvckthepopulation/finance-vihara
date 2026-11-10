@@ -37,9 +37,19 @@ test.describe("v10 penerimaan", () => {
     await selectByLabelRegex(page.getByLabel("Metode Penerimaan *"), /Transfer Bank/);
     const rekening = page.getByLabel("Rekening Tujuan");
     await expect(rekening).toBeVisible();
-    const rekLabels = await rekening.locator("option").allTextContents();
-    expect(rekLabels.some((l) => l.includes("6280-3488-88"))).toBeTruthy();
-    expect(rekLabels.some((l) => l.includes("Mandiri"))).toBeTruthy();
+    // Opsi rekening dimuat async setelah vihara dipilih — tunggu sampai
+    // benar-benar terisi, jangan baca isinya begitu select muncul (dulu
+    // flaky: lolos sendirian, gagal di suite penuh).
+    await expect
+      .poll(async () => await rekening.locator("option").allTextContents(), {
+        timeout: 10_000,
+      })
+      .toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("6280-3488-88"),
+          expect.stringContaining("Mandiri"),
+        ]),
+      );
   });
 
   test("submit penerimaan tunai → toast + baris Hari Ini", async ({ page }) => {

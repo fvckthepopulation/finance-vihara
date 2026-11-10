@@ -30,7 +30,10 @@ type NavItem = {
   icon: ReactNode;
   permission?: string; // hide item when user lacks this permission
   sub?: boolean; // sub-menu — indented under the item above
-  yayasanOnly?: boolean; // hide item for user vihara tetap (vihara_id terisi)
+  /** Hanya untuk pemegang akses tingkat yayasan (scope global/entity). */
+  yayasanOnly?: boolean;
+  /** Sembunyikan pada instance mode yayasan tunggal. */
+  hideInSingleEntity?: boolean;
 };
 type NavSection = { title: string; items: NavItem[] };
 
@@ -174,6 +177,7 @@ const SECTIONS: NavSection[] = [
         label: "Konsolidasi Yayasan",
         permission: "reports.pl.view",
         yayasanOnly: true,
+        hideInSingleEntity: true,
         icon: (
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M8 2v4M8 6L3 10M8 6l5 4" />
@@ -301,9 +305,13 @@ export function AppShell({ children, title, subtitle, actions }: Props) {
             const visibleItems = section.items.filter(
               (item) =>
                 (!item.permission || (user?.permissions.includes(item.permission) ?? false)) &&
-                // Konsolidasi dkk. hanya untuk level yayasan — sembunyikan bagi
-                // user yang terkunci ke satu vihara.
-                (!item.yayasanOnly || user?.vihara_id == null),
+                // Konsolidasi dkk. hanya untuk pemegang akses tingkat
+                // yayasan. Catatan: user dengan BEBERAPA vihara tetap bukan
+                // level yayasan — dulu cek `vihara_id == null` keliru
+                // meloloskan mereka.
+                (!item.yayasanOnly || (user?.can_see_yayasan_level ?? false)) &&
+                // Instance yayasan tunggal: sembunyikan menu lintas-vihara.
+                (!item.hideInSingleEntity || !(user?.app?.single_entity_mode ?? false)),
             );
             if (visibleItems.length === 0) return null;
             return (

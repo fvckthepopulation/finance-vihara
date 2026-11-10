@@ -1,14 +1,21 @@
-import { api } from "./api";
+import { api, ScopeType } from "./api";
+
+export type AdminUserVihara = { id: number; code: string; name: string };
 
 export type AdminUser = {
   id: number;
   name: string;
   email: string;
   entity_id: number | null;
-  outlet_id: number | null;
+  entity?: { id: number; code: string; legal_name: string } | null;
+  /** global = lintas yayasan, entity = satu yayasan, vihara = daftar vihara. */
+  scope_type: ScopeType;
+  viharas: AdminUserVihara[];
+  vihara_ids: number[];
+  /** Hanya terisi bila user terkunci ke tepat satu vihara. */
+  vihara_id: number | null;
   created_at: string;
-  roles: { id: number; name: string }[];
-  outlet?: { id: number; code: string; name: string } | null;
+  roles: string[];
 };
 
 export type AdminRole = {
@@ -18,6 +25,9 @@ export type AdminRole = {
   users_count: number;
   permissions: string[];
   is_protected: boolean;
+  description?: string | null;
+  /** Anjuran scope untuk role ini — bukan penegakan. */
+  default_scope?: ScopeType;
 };
 
 export const listAdminUsers = (q = "") =>
@@ -28,8 +38,11 @@ export type CreateUserPayload = {
   email: string;
   password: string;
   role: string;
+  /** Yayasan penaung. Wajib untuk scope `entity` dan `vihara`. */
   entity_id?: number | null;
-  outlet_id?: number | null;
+  scope_type: ScopeType;
+  /** Wajib (minimal satu) bila scope_type = "vihara". */
+  vihara_ids?: number[];
 };
 
 export const createAdminUser = (payload: CreateUserPayload) =>
@@ -39,7 +52,10 @@ export const createAdminUser = (payload: CreateUserPayload) =>
   });
 
 export type UpdateUserPayload = Partial<
-  Omit<CreateUserPayload, "password"> & { password: string }
+  Omit<CreateUserPayload, "password" | "scope_type"> & {
+    password: string;
+    scope_type: ScopeType;
+  }
 >;
 
 export const updateAdminUser = (id: number, payload: UpdateUserPayload) =>

@@ -61,16 +61,51 @@ export type Paginated<T> = {
   to: number | null;
 };
 
+/**
+ * Tingkat akses user. Dua sumbu yang sengaja dipisah:
+ *   roles/permissions = APA yang boleh dilakukan
+ *   scope_type/vihara_ids = DI MANA boleh dilakukan
+ */
+export type ScopeType = "global" | "entity" | "vihara";
+
+export type AuthEntity = {
+  id: number;
+  code: string;
+  legal_name: string;
+};
+
 export type AuthUser = {
   id: number;
   name: string;
   email: string;
   entity_id: number | null;
-  /** Vihara tetap milik user (multi-tenant). null/undefined = superadmin lintas vihara. */
+  entity?: AuthEntity | null;
+  /**
+   * global = lintas yayasan; entity = seluruh vihara di satu yayasan;
+   * vihara = hanya vihara di `vihara_ids`.
+   */
+  scope_type: ScopeType;
+  /** Vihara yang boleh diakses. null = tanpa batas (admin tertinggi). */
+  vihara_ids?: number[] | null;
+  /** Kompat klien lama: hanya terisi bila user terkunci ke TEPAT satu vihara. */
   vihara_id?: number | null;
+  /** Boleh membuka konsolidasi & data level yayasan. */
+  can_see_yayasan_level?: boolean;
   roles: string[];
   permissions: string[];
+  app?: {
+    /** Instance yayasan tunggal — sembunyikan pemilih vihara & konsolidasi. */
+    single_entity_mode: boolean;
+  };
 };
+
+/** true bila user boleh berpindah-pindah antar lebih dari satu vihara. */
+export function canSwitchVihara(user: AuthUser | null): boolean {
+  if (!user) return false;
+  if (user.app?.single_entity_mode) return false;
+  const ids = user.vihara_ids;
+  return ids == null || ids.length > 1;
+}
 
 export async function login(
   email: string,

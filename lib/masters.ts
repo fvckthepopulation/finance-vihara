@@ -105,19 +105,21 @@ export type MasterEntity = {
   npwp: string | null;
   address: string | null;
   active: boolean;
-  usage_count: number;
-  usage_breakdown: {
-    ap_invoices: number;
-    ar_invoices: number;
-    journal_entries: number;
-    petty_cash: number;
-  };
+  /** Jumlah vihara yang dinaungi yayasan ini. */
+  viharas_count: number;
+  viharas_active_count: number;
+  /** Jumlah pengguna yang terikat ke yayasan ini. */
+  users_count: number;
 };
 
-export const listEntities = (params: { active?: boolean } = {}) => {
+export const listEntities = async (params: { active?: boolean } = {}) => {
   const sp = new URLSearchParams();
   if (typeof params.active === "boolean") sp.set("active", String(params.active));
-  return api<MasterEntity[]>(`/api/master-entities${sp.toString() ? `?${sp}` : ""}`);
+  // /api/entities membungkus hasil dalam { data: [...] }.
+  const res = await api<{ data: MasterEntity[] }>(
+    `/api/entities${sp.toString() ? `?${sp}` : ""}`,
+  );
+  return res.data;
 };
 export const listEntitiesPaginated = (
   params: { active?: boolean; page?: number; per_page?: number } = {},
@@ -126,11 +128,11 @@ export const listEntitiesPaginated = (
   if (typeof params.active === "boolean") sp.set("active", String(params.active));
   if (params.page) sp.set("page", String(params.page));
   if (params.per_page) sp.set("per_page", String(params.per_page));
-  return api<Paginated<MasterEntity>>(`/api/master-entities?${sp}`);
+  return api<Paginated<MasterEntity>>(`/api/entities?${sp}`);
 };
 export const createEntity = (payload: Partial<MasterEntity>) =>
-  api<MasterEntity>(`/api/master-entities`, { method: "POST", body: JSON.stringify(payload) });
+  api<MasterEntity>(`/api/entities`, { method: "POST", body: JSON.stringify(payload) });
 export const updateEntity = (id: number, payload: Partial<MasterEntity>) =>
-  api<MasterEntity>(`/api/master-entities/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  api<MasterEntity>(`/api/entities/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
 export const deleteEntity = (id: number) =>
-  api<{ message: string }>(`/api/master-entities/${id}`, { method: "DELETE" });
+  api<{ message: string }>(`/api/entities/${id}`, { method: "DELETE" });

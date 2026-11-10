@@ -84,12 +84,11 @@ export default function EntitiesPage() {
               {e.address && <div><span className="text-km-ink-muted">Alamat:</span> <span>{e.address}</span></div>}
 
               <div className="mt-2 border-t border-km-border pt-2">
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-km-ink-muted">Usage</p>
-                <div className="grid grid-cols-4 gap-1 text-[10px]">
-                  <Stat label="AP Inv" value={e.usage_breakdown.ap_invoices} />
-                  <Stat label="AR Inv" value={e.usage_breakdown.ar_invoices} />
-                  <Stat label="Jurnal" value={e.usage_breakdown.journal_entries} />
-                  <Stat label="Petty" value={e.usage_breakdown.petty_cash} />
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-km-ink-muted">Cakupan</p>
+                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <Stat label="Vihara" value={e.viharas_count ?? 0} />
+                  <Stat label="Aktif" value={e.viharas_active_count ?? 0} />
+                  <Stat label="Pengguna" value={e.users_count ?? 0} />
                 </div>
               </div>
             </div>

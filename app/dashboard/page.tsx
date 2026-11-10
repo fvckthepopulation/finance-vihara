@@ -250,7 +250,10 @@ export default function DashboardPage() {
                   <div className="text-[11px] font-semibold uppercase tracking-[.05em] text-km-ink-muted">
                     Total Penerimaan
                   </div>
-                  <div className="mt-0.5 text-[26px] font-bold leading-[1.15] tabular-nums text-km-green">
+                  <div
+                    data-testid="dashboard-total-penerimaan"
+                    className="mt-0.5 text-[26px] font-bold leading-[1.15] tabular-nums text-km-green"
+                  >
                     {fmtRp(masuk?.total ?? 0)}
                   </div>
                   <div className="mt-0.5 text-[11px] text-km-ink-muted">

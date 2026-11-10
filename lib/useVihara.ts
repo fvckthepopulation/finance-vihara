@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 
 // ============================================================================
-// Vihara selector (multi-tenant) — module store + hook.
+// Pemilih vihara (hirarki Yayasan -> Vihara) — module store + hook.
 //
-// - User dengan vihara_id tetap → selalu terkunci ke vihara itu (fixed).
-// - Superadmin (vihara_id null) → pilihan disimpan di localStorage `vf_vihara`;
-//   null berarti "Semua Vihara". Semua subscriber (halaman) refetch saat
-//   pilihan berubah karena state module-level di-broadcast ke listener.
+// Tiga kemungkinan, mengikuti users.scope_type di API:
+//
+//   scope global  -> boleh semua vihara; pilihan null = "Semua Vihara".
+//   scope entity  -> boleh semua vihara di yayasannya; null = "Semua Vihara"
+//                    (sebatas yayasan itu — API yang membatasi, bukan UI).
+//   scope vihara  -> hanya vihara di `vihara_ids`:
+//                      1 vihara  -> terkunci (fixed), tidak bisa diganti.
+//                      >1 vihara -> boleh berpindah, TAPI hanya di antara
+//                                   vihara miliknya; null = semua miliknya.
+//
+// Pilihan disimpan di localStorage `vf_vihara`. Pilihan yang tidak lagi
+// diizinkan (mis. user dipindah vihara) otomatis dibuang.
 // ============================================================================
 
 const STORAGE_KEY = "vf_vihara";
@@ -26,7 +34,7 @@ function initFromStorage() {
   selected = Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Set pilihan vihara global (superadmin). null = Semua Vihara. */
+/** Set pilihan vihara global. null = semua vihara yang boleh diakses. */
 export function setSelectedVihara(id: number | null) {
   selected = id;
   if (typeof window !== "undefined") {
@@ -37,10 +45,14 @@ export function setSelectedVihara(id: number | null) {
 }
 
 export type UseVihara = {
-  /** Vihara aktif untuk fetch (`vihara_id` param). null = semua vihara. */
+  /** Vihara aktif untuk fetch (`vihara_id` param). null = semua yang boleh. */
   viharaId: number | null;
-  /** true bila user terkunci ke satu vihara (tidak bisa ganti). */
+  /** true bila user terkunci ke tepat satu vihara (tidak bisa ganti). */
   fixed: boolean;
+  /** Daftar id vihara yang boleh dipilih. null = tanpa batas. */
+  allowedIds: number[] | null;
+  /** true bila pemilih vihara layak ditampilkan sama sekali. */
+  selectable: boolean;
   /** true setelah info auth selesai dimuat (fixed/viharaId sudah final). */
   ready: boolean;
   setViharaId: (id: number | null) => void;
@@ -60,12 +72,33 @@ export function useVihara(): UseVihara {
     };
   }, []);
 
-  const fixedId = user?.vihara_id ?? null;
-  const fixed = fixedId != null;
+  const allowedIds = user?.vihara_ids ?? null;
+  const singleEntityMode = user?.app?.single_entity_mode ?? false;
+
+  // Terkunci bila hanya punya tepat satu vihara, atau instance ini memang
+  // yayasan tunggal tanpa cabang.
+  const lockedId =
+    allowedIds != null && allowedIds.length === 1 ? allowedIds[0] : null;
+  const fixed = lockedId != null;
+
+  // Buang pilihan tersimpan yang sudah tidak diizinkan.
+  const effective =
+    sel != null && allowedIds != null && !allowedIds.includes(sel) ? null : sel;
+
+  useEffect(() => {
+    if (!loading && sel != null && allowedIds != null && !allowedIds.includes(sel)) {
+      setSelectedVihara(null);
+    }
+  }, [loading, sel, allowedIds]);
+
+  const selectable =
+    !singleEntityMode && !fixed && (allowedIds == null || allowedIds.length > 1);
 
   return {
-    viharaId: fixed ? fixedId : sel,
+    viharaId: fixed ? lockedId : effective,
     fixed,
+    allowedIds,
+    selectable,
     ready: !loading,
     setViharaId: setSelectedVihara,
   };
