@@ -16,6 +16,7 @@ import {
 } from "@/lib/pembayaran";
 import { listTransactionNames, TransactionName } from "@/lib/transactionNames";
 import { listTransactions, TransactionRow } from "@/lib/transactions";
+import { useAuth } from "@/lib/useAuth";
 import { useVihara } from "@/lib/useVihara";
 
 const fmtRp = (n: string | number) =>
@@ -36,6 +37,8 @@ export default function PembayaranPage() {
   const { viharaId: headerViharaId, ready: viharaReady } = useVihara();
 
   // ----- form state -----
+  const { can } = useAuth();
+  const bisaSetujui = can("pembayaran.approve");
   const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState(0);
@@ -185,12 +188,20 @@ export default function PembayaranPage() {
       if (attachment) {
         await uploadPembayaranAttachment(created.id, attachment);
       }
-      await postPembayaran(created.id);
-      setToast(
-        attachment
-          ? "Pengeluaran berhasil disimpan beserta lampirannya"
-          : "Pengeluaran berhasil disimpan",
-      );
+      // Posting hanya bila pengguna memang berhak menyetujui. Tanpa izin
+      // itu transaksi berhenti sebagai draft dan menunggu persetujuan —
+      // dulu UI tetap memanggil post, lalu gagal 403 dan meninggalkan draft
+      // gantung yang tidak terlihat di layar mana pun.
+      if (bisaSetujui) {
+        await postPembayaran(created.id);
+        setToast(
+          attachment
+            ? "Pengeluaran berhasil disimpan beserta lampirannya"
+            : "Pengeluaran berhasil disimpan",
+        );
+      } else {
+        setToast("Tersimpan sebagai draft — menunggu persetujuan");
+      }
       // Yayasan/vihara dipertahankan supaya entri berikutnya untuk vihara
       // yang sama tidak perlu dipilih ulang.
       resetForm({ keepScope: true });
@@ -371,7 +382,11 @@ export default function PembayaranPage() {
               >
                 <path d="M3 8l4 4 6-7" />
               </svg>
-              {pending ? "Menyimpan…" : "Simpan Pengeluaran"}
+              {pending
+                ? "Menyimpan…"
+                : bisaSetujui
+                  ? "Simpan Pengeluaran"
+                  : "Simpan sebagai Draft"}
             </Button>
           </div>
         </Card>

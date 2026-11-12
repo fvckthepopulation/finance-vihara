@@ -20,8 +20,10 @@ import {
   pettyCashSourceLabel,
   PettyCashSummary,
   postPettyCash,
+  voidPettyCashMovement,
 } from "@/lib/pettyCash";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
+import { useAuth } from "@/lib/useAuth";
 
 const fmtRp = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 const fmtTgl = (iso: string) =>
@@ -44,6 +46,9 @@ export default function PettyCashPage() {
   // satu vihara. Jadi viharanya dipilih DI HALAMAN INI, bukan diwarisi dari
   // pemilih di header: saldo yang terlihat dan transaksi yang dicatat harus
   // menunjuk vihara yang sama, dan harus terbaca jelas yang mana.
+  const { can } = useAuth();
+  const canVoid = can("petty_cash.void");
+  const bisaSetujui = can("petty_cash.approve");
   const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
   const viharaId = scope.viharaId;
   const ready = true;
@@ -111,6 +116,26 @@ export default function PettyCashPage() {
     source.forEach((p, i) => map.set(p.id, i));
     return map;
   }, [summary, pics]);
+
+  async function handleVoid(r: { id: number }) {
+    const alasan = window.prompt(
+      `Batalkan mutasi kas kecil #${r.id}?\n\nMutasi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
+    );
+    if (alasan == null) return;
+    if (alasan.trim().length < 3) {
+      setToast({ message: "Alasan pembatalan terlalu singkat.", tone: "error" });
+      return;
+    }
+    try {
+      await voidPettyCashMovement(r.id, alasan.trim());
+      afterSaved("Mutasi kas kecil dibatalkan");
+    } catch (e) {
+      setToast({
+        message: e instanceof Error ? e.message : "Gagal membatalkan mutasi",
+        tone: "error",
+      });
+    }
+  }
 
   function afterSaved(message: string) {
     setToast({ message, tone: "success" });
@@ -182,7 +207,8 @@ export default function PettyCashPage() {
             viharaId={viharaId}
             fixed={fixed}
             needVihara={needVihara}
-            onSaved={() => afterSaved("Pengisian kas kecil tercatat")}
+            bisaSetujui={bisaSetujui}
+            onSaved={() => afterSaved(bisaSetujui ? "Pengisian kas kecil tercatat" : "Tersimpan sebagai draft — menunggu persetujuan")}
             onError={(m) => setToast({ message: m, tone: "error" })}
           />
           <UsageForm
@@ -190,7 +216,8 @@ export default function PettyCashPage() {
             viharaId={viharaId}
             fixed={fixed}
             needVihara={needVihara}
-            onSaved={() => afterSaved("Penggunaan kas kecil tercatat")}
+            bisaSetujui={bisaSetujui}
+            onSaved={() => afterSaved(bisaSetujui ? "Penggunaan kas kecil tercatat" : "Tersimpan sebagai draft — menunggu persetujuan")}
             onError={(m) => setToast({ message: m, tone: "error" })}
           />
         </div>
@@ -226,16 +253,17 @@ export default function PettyCashPage() {
                   <Th className="text-right">Masuk</Th>
                   <Th className="text-right">Keluar</Th>
                   <Th>No. Bukti</Th>
+                  <Th>Aksi</Th>
                 </tr>
               </thead>
               <tbody>
                 {rowsLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
+                    <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                    <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
                       Belum ada mutasi kas kecil
                     </td>
                   </tr>
@@ -280,6 +308,14 @@ export default function PettyCashPage() {
                                 Draft
                               </span>
                             )}
+                            {r.status === "cancelled" && (
+                              <span
+                                className="inline-flex items-center whitespace-nowrap rounded-full bg-km-red-soft px-1.5 py-0.5 text-[10px] font-medium text-km-red-ink"
+                                title={r.void_reason ?? undefined}
+                              >
+                                Dibatalkan
+                              </span>
+                            )}
                           </span>
                         </Td>
                         <Td className="text-right font-mono tabular-nums text-km-green">
@@ -289,6 +325,20 @@ export default function PettyCashPage() {
                           {!isTopup ? fmtRp(amount) : "—"}
                         </Td>
                         <Td className="text-[11px] text-km-ink-muted">{r.reference || "—"}</Td>
+                        <Td>
+                          {canVoid && r.status === "posted" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleVoid(r)}
+                              data-testid={`batalkan-kaskecil-${r.id}`}
+                              className="whitespace-nowrap text-[11px] text-km-red-ink hover:underline"
+                            >
+                              Batalkan
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-km-ink-muted">—</span>
+                          )}
+                        </Td>
                       </tr>
                     );
                   })
@@ -309,6 +359,7 @@ function TopupForm({
   viharaId,
   fixed,
   needVihara,
+  bisaSetujui,
   onSaved,
   onError,
 }: {
@@ -317,6 +368,7 @@ function TopupForm({
   viharaId: number | null;
   fixed: boolean;
   needVihara: boolean;
+  bisaSetujui: boolean;
   onSaved: () => void;
   onError: (message: string) => void;
 }) {
@@ -348,7 +400,9 @@ function TopupForm({
         ...(notes ? { description: notes } : {}),
         ...(fixed ? {} : { vihara_id: viharaId! }),
       });
-      await postPettyCash(created.id);
+      // Tanpa izin menyetujui, mutasi berhenti sebagai draft — bukan
+      // dipaksa post lalu gagal 403 dan meninggalkan draft gantung.
+      if (bisaSetujui) await postPettyCash(created.id);
       setDate(today());
       setPicId("");
       setAmount(0);
@@ -428,6 +482,7 @@ function UsageForm({
   viharaId,
   fixed,
   needVihara,
+  bisaSetujui,
   onSaved,
   onError,
 }: {
@@ -435,6 +490,7 @@ function UsageForm({
   viharaId: number | null;
   fixed: boolean;
   needVihara: boolean;
+  bisaSetujui: boolean;
   onSaved: () => void;
   onError: (message: string) => void;
 }) {
@@ -463,7 +519,9 @@ function UsageForm({
         ...(purpose ? { description: purpose } : {}),
         ...(fixed ? {} : { vihara_id: viharaId! }),
       });
-      await postPettyCash(created.id);
+      // Tanpa izin menyetujui, mutasi berhenti sebagai draft — bukan
+      // dipaksa post lalu gagal 403 dan meninggalkan draft gantung.
+      if (bisaSetujui) await postPettyCash(created.id);
       setDate(today());
       setPicId("");
       setPurpose("");

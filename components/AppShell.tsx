@@ -28,7 +28,12 @@ type NavItem = {
   href: string;
   label: string;
   icon: ReactNode;
-  permission?: string; // hide item when user lacks this permission
+  /**
+   * Sembunyikan item bila pengguna tidak punya izin ini. Boleh beberapa —
+   * artinya "salah satu cukup", dipakai menu Persetujuan yang relevan bagi
+   * pemegang izin menyetujui jenis transaksi mana pun.
+   */
+  permission?: string | string[];
   sub?: boolean; // sub-menu — indented under the item above
   /** Hanya untuk pemegang akses tingkat yayasan (scope global/entity). */
   yayasanOnly?: boolean;
@@ -87,6 +92,18 @@ const SECTIONS: NavSection[] = [
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M14 8H2M8 3L3 8l5 5" />
             <path d="M14 12H8" />
+          </svg>
+        ),
+      },
+      {
+        href: "/persetujuan",
+        label: "Persetujuan",
+        // Tampil bagi pemegang salah satu izin menyetujui. Halamannya
+        // sendiri memeriksa lagi per baris.
+        permission: ["pembayaran.approve", "penerimaan.approve"],
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M2 8.5l3.5 3.5L14 4" />
           </svg>
         ),
       },
@@ -304,7 +321,10 @@ export function AppShell({ children, title, subtitle, actions }: Props) {
       {SECTIONS.map((section) => {
             const visibleItems = section.items.filter(
               (item) =>
-                (!item.permission || (user?.permissions.includes(item.permission) ?? false)) &&
+                (!item.permission ||
+                  (Array.isArray(item.permission)
+                    ? item.permission.some((p) => user?.permissions.includes(p) ?? false)
+                    : (user?.permissions.includes(item.permission) ?? false))) &&
                 // Konsolidasi dkk. hanya untuk pemegang akses tingkat
                 // yayasan. Catatan: user dengan BEBERAPA vihara tetap bukan
                 // level yayasan — dulu cek `vihara_id == null` keliru

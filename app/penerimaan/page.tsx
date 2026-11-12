@@ -34,10 +34,11 @@ const METHOD_LABEL: Record<string, string> = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PenerimaanPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   // Header hanya menyaring tabel di bawah form. Vihara transaksi berasal
   // dari form — alasannya sama dengan Input Pengeluaran.
   const { viharaId: headerViharaId, ready: viharaReady } = useVihara();
+  const bisaSetujui = can("penerimaan.approve");
   const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
   const viharaId = scope.viharaId;
 
@@ -176,8 +177,12 @@ export default function PenerimaanPage() {
         // Selalu eksplisit: vihara transaksi adalah isi form, bukan header.
         vihara_id: scope.viharaId,
       });
-      await postPenerimaan(created.id);
-      setToast("Penerimaan berhasil disimpan");
+      if (bisaSetujui) {
+        await postPenerimaan(created.id);
+        setToast("Penerimaan berhasil disimpan");
+      } else {
+        setToast("Tersimpan sebagai draft — menunggu persetujuan");
+      }
       resetForm();
       reloadToday();
     } catch (err) {
@@ -321,7 +326,11 @@ export default function PenerimaanPage() {
               >
                 <path d="M3 8l4 4 6-7" />
               </svg>
-              {pending ? "Menyimpan…" : "Simpan Penerimaan"}
+              {pending
+                ? "Menyimpan…"
+                : bisaSetujui
+                  ? "Simpan Penerimaan"
+                  : "Simpan sebagai Draft"}
             </Button>
           </div>
         </Card>

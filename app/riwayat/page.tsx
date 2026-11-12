@@ -10,6 +10,7 @@ import { Pagination } from "@/components/Pagination";
 import {
   exportTransactionsCsv,
   fetchTransactionAttachment,
+  voidTransaction,
   listTransactions,
   ListTransactionsParams,
   TransactionRow,
@@ -18,6 +19,7 @@ import {
   TransactionTipe,
   TransactionsResponse,
 } from "@/lib/transactions";
+import { useAuth } from "@/lib/useAuth";
 import { useVihara } from "@/lib/useVihara";
 
 const fmtRp = (n: string | number) =>
@@ -39,6 +41,13 @@ const filterInputClass =
 
 export default function RiwayatPage() {
   const { viharaId, ready: viharaReady } = useVihara();
+  const { can } = useAuth();
+  // Satu izin cukup untuk memunculkan kolom; tiap barisnya dicek lagi sesuai
+  // jenisnya, dan server tetap menolak yang tidak berhak.
+  const bisaBatalkan = can("pembayaran.void") || can("penerimaan.void");
+  // Dinaikkan setelah pembatalan supaya daftarnya dimuat ulang.
+  const [revisi, setRevisi] = useState(0);
+  const reload = () => setRevisi((n) => n + 1);
 
   // ----- filter state -----
   const [search, setSearch] = useState("");
@@ -121,6 +130,8 @@ export default function RiwayatPage() {
     sumber,
     status,
     page,
+    // Dinaikkan sesudah pembatalan supaya daftarnya dimuat ulang.
+    revisi,
   ]);
 
   function clearFilters() {
@@ -269,18 +280,19 @@ export default function RiwayatPage() {
                 <Th className="text-right">Jumlah</Th>
                 <Th>Status</Th>
                 <Th>Bukti</Th>
+                {bisaBatalkan && <Th>Aksi</Th>}
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={bisaBatalkan ? 8 : 7} className="px-3 py-10 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center">
+                  <td colSpan={bisaBatalkan ? 8 : 7} className="px-3 py-10 text-center">
                     <p className="text-[13px] font-medium text-km-ink-soft">
                       Tidak ada transaksi
                     </p>
@@ -325,7 +337,15 @@ export default function RiwayatPage() {
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
-                      {r.status === "posted" ? (
+                      {r.status === "cancelled" ? (
+                        <span
+                          className="inline-flex items-center whitespace-nowrap rounded-full bg-km-red-soft px-2 py-0.5 text-[11px] font-medium text-km-red-ink"
+                          title={r.void_reason ?? undefined}
+                          data-testid={`status-cancelled-${r.id}`}
+                        >
+                          Dibatalkan
+                        </span>
+                      ) : r.status === "posted" ? (
                         <span className="inline-flex items-center whitespace-nowrap rounded-full bg-km-green-soft px-2 py-0.5 text-[11px] font-medium text-km-green">
                           Posted
                         </span>
@@ -338,6 +358,11 @@ export default function RiwayatPage() {
                     <Td>
                       <BuktiLink row={r} onError={setError} />
                     </Td>
+                    {bisaBatalkan && (
+                      <Td>
+                        <BatalkanButton row={r} onError={setError} onDone={reload} />
+                      </Td>
+                    )}
                   </tr>
                 ))
               )}
@@ -434,6 +459,59 @@ function BuktiLink({
         <path d="M9 2v3h3" />
       </svg>
       {pending ? "Membuka…" : "Lihat"}
+    </button>
+  );
+}
+
+/**
+ * Tombol pembatalan. Yang terjadi di server adalah jurnal pembalik, bukan
+ * penghapusan — karena itu konfirmasinya menyebut hal itu, dan alasannya
+ * wajib: alasan inilah satu-satunya jejak NIAT di balik pembatalan.
+ */
+function BatalkanButton({
+  row,
+  onError,
+  onDone,
+}: {
+  row: TransactionRow;
+  onError: (pesan: string) => void;
+  onDone: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+
+  if (row.status !== "posted") {
+    return <span className="text-[11px] text-km-ink-muted">—</span>;
+  }
+
+  async function batalkan() {
+    const alasan = window.prompt(
+      `Batalkan ${row.code}?\n\nTransaksi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
+    );
+    if (alasan == null) return;
+    if (alasan.trim().length < 3) {
+      onError("Alasan pembatalan terlalu singkat.");
+      return;
+    }
+    setPending(true);
+    try {
+      await voidTransaction(row, alasan.trim());
+      onDone();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Gagal membatalkan transaksi");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={batalkan}
+      disabled={pending}
+      data-testid={`batalkan-${row.tipe}-${row.id}`}
+      className="whitespace-nowrap rounded-md border border-km-border px-1.5 py-0.5 text-[11px] text-km-red-ink hover:bg-km-red-soft disabled:opacity-60"
+    >
+      {pending ? "Membatalkan…" : "Batalkan"}
     </button>
   );
 }

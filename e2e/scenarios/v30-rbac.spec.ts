@@ -38,6 +38,24 @@ test.describe("v30 rbac", () => {
     // yang diuji di sini: tidak ada lagi blokir "pilih vihara dulu".
     await expect(page.getByText("Pilih yayasan dan vihara dulu")).toHaveCount(0);
     await page.getByLabel("Jumlah (Rp) *").fill("10000");
-    await expect(page.getByRole("button", { name: "Simpan Penerimaan" })).toBeEnabled();
+
+    // bendahara adalah PENCATAT: punya penerimaan.create tanpa
+    // penerimaan.approve. Jadi tombolnya menyebut draft, bukan simpan-dan-
+    // posting — dan itu memang desain seeder sejak awal, hanya dulu UI-nya
+    // tetap memaksa posting lalu gagal 403.
+    await expect(page.getByRole("button", { name: "Simpan sebagai Draft" })).toBeEnabled();
+    await expect(page.locator('a[href="/persetujuan"]')).toHaveCount(0);
+  });
+
+  test("approver: melihat menu Persetujuan, bukan form pencatatan", async ({ page }) => {
+    // Pasangan bendahara. Role approver punya *.approve tanpa *.create —
+    // sebelum ada layar persetujuan, role ini tidak punya cara memposting
+    // apa pun sama sekali.
+    await login(page, "approver");
+    await expect(page.locator('a[href="/persetujuan"]').first()).toBeVisible();
+
+    await page.goto("/persetujuan");
+    // CardHeader merender judulnya sebagai <p>, bukan heading.
+    await expect(page.getByText("Menunggu persetujuan")).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -14,6 +14,7 @@ import {
   JournalEntryRow,
   createJournalEntry,
   deleteJournalEntry,
+  voidJournalEntry,
   getJournalEntry,
   journalSourceLabel,
   listJournalEntries,
@@ -31,12 +32,13 @@ type SourceFilter = "" | keyof typeof JOURNAL_SOURCE_LABEL;
 export default function JurnalPage() {
   const { can } = useAuth();
   const canCreate = can("journal.create");
+  const canVoid = can("journal.void");
 
   const [rows, setRows] = useState<JournalEntryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<SourceFilter>("");
-  const [status, setStatus] = useState<"" | "draft" | "posted">("");
+  const [status, setStatus] = useState<"" | "draft" | "posted" | "cancelled">("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
@@ -66,6 +68,23 @@ export default function JurnalPage() {
     listCoa({ active: true }).then(setAccounts).catch(() => {});
     listEntities({ active: true }).then(setEntities).catch(() => {});
   }, []);
+
+  async function handleVoid(r: { id: number }) {
+    const alasan = window.prompt(
+      `Batalkan JE #${r.id}?\n\nJurnal TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
+    );
+    if (alasan == null) return;
+    if (alasan.trim().length < 3) {
+      setError("Alasan pembatalan terlalu singkat.");
+      return;
+    }
+    try {
+      await voidJournalEntry(r.id, alasan.trim());
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal membatalkan jurnal");
+    }
+  }
 
   async function handleDelete(r: JournalEntryRow) {
     if (!confirm(`Hapus draft JE #${r.id}? Hanya draft manual yang bisa dihapus.`)) return;
@@ -170,8 +189,20 @@ export default function JurnalPage() {
                   <Td className="text-right">{fmtRp(r.total_debit)}</Td>
                   <Td className="text-right">{fmtRp(r.total_credit)}</Td>
                   <Td>
-                    <Badge tone={r.status === "posted" ? "success" : "neutral"}>
-                      {r.status === "posted" ? "Posted" : "Draft"}
+                    <Badge
+                      tone={
+                        r.status === "cancelled"
+                          ? "danger"
+                          : r.status === "posted"
+                            ? "success"
+                            : "neutral"
+                      }
+                    >
+                      {r.status === "cancelled"
+                        ? "Dibatalkan"
+                        : r.status === "posted"
+                          ? "Posted"
+                          : "Draft"}
                     </Badge>
                   </Td>
                   <Td className="text-right">
@@ -187,6 +218,18 @@ export default function JurnalPage() {
                         className="text-[11px] text-km-red-ink hover:underline"
                       >
                         Hapus
+                      </button>
+                    )}
+                    {/* Hanya jurnal MANUAL. Jurnal yang lahir dari
+                        pembayaran/penerimaan dibatalkan lewat transaksinya,
+                        supaya dokumen dan buku besar tidak berbeda. */}
+                    {canVoid && r.reference_type === "manual" && r.status === "posted" && (
+                      <button
+                        onClick={() => handleVoid(r)}
+                        data-testid={`batalkan-je-${r.id}`}
+                        className="text-[11px] text-km-red-ink hover:underline"
+                      >
+                        Batalkan
                       </button>
                     )}
                   </Td>

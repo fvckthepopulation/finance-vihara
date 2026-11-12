@@ -55,7 +55,10 @@ export type PettyCashEntry = {
   source_bank_account?: { id: number; bank_name: string; account_number: string } | null;
   reference?: string | null;
   description?: string | null;
+  /** draft | posted | cancelled. cancelled = dibatalkan lewat jurnal pembalik. */
   status?: string;
+  voided_at?: string | null;
+  void_reason?: string | null;
 };
 
 export const pettyCashDate = (e: PettyCashEntry): string =>
@@ -132,3 +135,10 @@ export const getPettyCashSummary = (viharaId?: number | null) => {
   if (viharaId != null) sp.set("vihara_id", String(viharaId));
   return api<PettyCashSummary>(`/api/petty-cash/summary${sp.toString() ? `?${sp}` : ""}`);
 };
+
+/** Batalkan mutasi kas kecil terposting — server menulis jurnal pembalik. */
+export const voidPettyCashMovement = (id: number, reason: string) =>
+  api<unknown>(`/api/petty-cash/${id}/void`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });

@@ -4,7 +4,7 @@ import { api, API_URL, getToken, Paginated } from "./api";
 
 export type TransactionTipe = "Penerimaan" | "Pengeluaran";
 export type TransactionSource = "km" | "manual";
-export type TransactionStatus = "draft" | "posted";
+export type TransactionStatus = "draft" | "posted" | "cancelled";
 
 export type TransactionRow = {
   id: number;
@@ -29,6 +29,9 @@ export type TransactionRow = {
   bank_label?: string | null;
   /** Ada lampiran bukti (kuitansi/invoice) yang bisa dibuka. */
   has_attachment?: boolean;
+  /** Terisi bila transaksi sudah dibatalkan lewat jurnal pembalik. */
+  voided_at?: string | null;
+  void_reason?: string | null;
   /**
    * Referensi eksternal — untuk `source: "km"` berisi ref donasi KalyanaMitta
    * (dipakai link drill-down "KM ↗"). Opsional: backend pra-Phase 7 belum
@@ -101,6 +104,21 @@ export async function fetchTransactionAttachment(
   const res = await fetch(`${API_URL}/api/${modul}/${row.id}/attachment`, { headers });
   if (!res.ok) throw new Error(`Gagal membuka lampiran (HTTP ${res.status})`);
   return res.blob();
+}
+
+/**
+ * Batalkan transaksi terposting. Server menulis jurnal pembalik dan
+ * menyimpan alasannya; barisnya tidak dihapus, hanya ditandai dibatalkan.
+ */
+export async function voidTransaction(
+  row: Pick<TransactionRow, "id" | "tipe">,
+  reason: string,
+): Promise<void> {
+  const modul = row.tipe === "Pengeluaran" ? "pembayaran" : "penerimaan";
+  await api(`/api/${modul}/${row.id}/void`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function exportTransactionsCsv(

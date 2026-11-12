@@ -18,7 +18,8 @@ export type JournalEntryRow = {
   reference?: string | null;
   total_debit: string;
   total_credit: string;
-  status: "draft" | "posted";
+  /** cancelled = dibatalkan lewat jurnal pembalik; barisnya tetap ada. */
+  status: "draft" | "posted" | "cancelled";
   posted_at: string | null;
   created_by_user_id: number | null;
   entity?: { id: number; code: string };
@@ -108,6 +109,13 @@ export const createJournalEntry = (payload: CreateJournalEntryPayload) =>
   api<JournalEntryDetail>(`/api/journal-entries`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+/** Batalkan jurnal terposting — server menulis jurnal pembalik. */
+export const voidJournalEntry = (id: number, reason: string) =>
+  api<unknown>(`/api/journal-entries/${id}/void`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 
 export const deleteJournalEntry = (id: number) =>

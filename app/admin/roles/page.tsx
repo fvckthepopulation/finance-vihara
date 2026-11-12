@@ -30,6 +30,7 @@ export default function AdminRolesPage() {
 
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [allPermissions, setAllPermissions] = useState<string[]>([]);
+  const [permDesc, setPermDesc] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // null = tidak ada dialog; "new" = buat role baru; objek = edit role itu.
@@ -41,6 +42,7 @@ export default function AdminRolesPage() {
       .then(([r, p]) => {
         setRoles(r);
         setAllPermissions(p.permissions);
+        setPermDesc(p.descriptions ?? {});
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"))
       .finally(() => setLoading(false));
@@ -153,6 +155,7 @@ export default function AdminRolesPage() {
           role={editing === "new" ? null : editing}
           existingNames={roles.map((r) => r.name)}
           allPermissions={allPermissions}
+          permDesc={permDesc}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -170,11 +173,12 @@ export default function AdminRolesPage() {
  * di kedua jalur — tidak ada dua matriks yang bisa berbeda diam-diam.
  */
 function RoleEditor({
-  role, existingNames, allPermissions, onClose, onSaved,
+  role, existingNames, allPermissions, permDesc, onClose, onSaved,
 }: {
   role: AdminRole | null;
   existingNames: string[];
   allPermissions: string[];
+  permDesc: Record<string, string>;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -311,16 +315,29 @@ function RoleEditor({
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                  {/* Keterangan tiap hak ditampilkan di bawah namanya:
+                      nama key saja tidak menjelaskan cakupannya — paling
+                      terasa pada masters.manage. */}
                   {perms.map((p) => (
-                    <label key={p} className="flex items-center gap-2 text-[12px] cursor-pointer">
+                    <label key={p} className="flex items-start gap-2 text-[12px] cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selected.has(p)}
                         onChange={() => toggle(p)}
-                        className="h-3.5 w-3.5 accent-km-blue"
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-km-blue"
                         data-testid={`perm-${p}`}
                       />
-                      <span className="font-mono text-[11px]">{p}</span>
+                      <span className="min-w-0">
+                        <span className="block font-mono text-[11px]">{p}</span>
+                        {permDesc[p] && (
+                          <span
+                            className="block text-[10.5px] leading-snug text-km-ink-muted"
+                            data-testid={`perm-desc-${p}`}
+                          >
+                            {permDesc[p]}
+                          </span>
+                        )}
+                      </span>
                     </label>
                   ))}
                 </div>

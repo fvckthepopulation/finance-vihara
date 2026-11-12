@@ -75,7 +75,14 @@ export const listAdminRoles = () =>
   api<AdminRole[]>(`/api/admin/roles`);
 
 export const getPermissionsCatalog = () =>
-  api<{ permissions: string[]; catalog: string[] }>(`/api/admin/permissions`);
+  api<{
+    permissions: string[];
+    catalog: string[];
+    /** Keterangan tiap hak, untuk ditampilkan di matrix. */
+    descriptions?: Record<string, string>;
+    /** Hak yang sengaja disembunyikan karena belum mengatur apa pun. */
+    hidden?: string[];
+  }>(`/api/admin/permissions`);
 
 export const updateRolePermissions = (id: number, permissions: string[]) =>
   api<{ id: number; name: string; permissions: string[] }>(
