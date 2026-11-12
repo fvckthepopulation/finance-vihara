@@ -164,7 +164,7 @@ export default function RiwayatPage() {
       subtitle="Riwayat lengkap penerimaan & pengeluaran"
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}

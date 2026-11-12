@@ -1,28 +1,43 @@
 /**
  * v10 — Input Penerimaan.
  * Yang diuji: cascade kategori → nama penerimaan, metode Transfer Bank
- * membuka pilihan Rekening Tujuan, blocking hint saat "Semua Vihara",
+ * membuka pilihan Rekening Tujuan, penahan sebelum vihara dipilih,
  * submit penerimaan tunai → toast sukses + baris di "Penerimaan Hari Ini".
+ *
+ * Sejak vihara transaksi pindah dari header ke form (seragam dengan Input
+ * Pengeluaran), tiap tes memilih vihara DI FORM. Header tetap dipakai
+ * karena yang menyaring tabel "Penerimaan Hari Ini" masih header.
  */
 import { test, expect } from "@playwright/test";
-import { login, pickViharaVVG } from "../fixtures/auth";
+import { apiToken, login, pickViharaVVG, viharaIdsByCode } from "../fixtures/auth";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
 test.describe("v10 penerimaan", () => {
-  test("hint blokir muncul saat Semua Vihara terpilih", async ({ page }) => {
+  let viharaVvg = 0;
+
+  test.beforeAll(async () => {
+    await apiToken("admin");
+    viharaVvg = (await viharaIdsByCode()).VVG;
+  });
+
+  test("penahan muncul sampai vihara dipilih di form", async ({ page }) => {
     await login(page, "admin");
-    const select = page.getByLabel("Pilih vihara");
-    await expect(select.locator("option")).toHaveCount(4, { timeout: 10_000 });
-    await select.selectOption({ index: 0 }); // "Semua Vihara"
     await page.goto("/penerimaan");
-    await expect(page.getByText("Pilih vihara dulu di header")).toBeVisible();
+
+    // Pilihan header tidak lagi menentukan — yang menahan adalah isi form.
+    await expect(page.getByTestId("form-vihara")).toHaveValue("", { timeout: 10_000 });
+    await expect(page.getByText("Pilih yayasan dan vihara dulu")).toBeVisible();
+
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
+    await expect(page.getByText("Pilih yayasan dan vihara dulu")).toHaveCount(0);
   });
 
   test("cascade kategori → nama; Transfer Bank membuka Rekening Tujuan", async ({ page }) => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/penerimaan");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     // Nama Penerimaan disabled sebelum kategori dipilih.
     const nama = page.getByLabel("Nama Penerimaan *");
@@ -56,9 +71,18 @@ test.describe("v10 penerimaan", () => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/penerimaan");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     const catatan = uniq("E2E-PNR");
-    await page.getByLabel("Jumlah (Rp) *").fill("123000");
+    // Isian yang diketik sebelum React selesai hydrate hilang saat hydrate
+    // (dulu flaky: Jumlah terkirim 0 dan API menolak). Format ribuan
+    // "123.000" hanya muncul bila React yang menangani ketikan, jadi itu
+    // tanda isian benar-benar masuk ke state.
+    const jumlah = page.getByLabel("Jumlah (Rp) *");
+    await expect(async () => {
+      await jumlah.fill("123000");
+      await expect(jumlah).toHaveValue("123.000", { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Perayaan/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dana Kathina/);
     await page.getByLabel("Catatan").fill(catatan);

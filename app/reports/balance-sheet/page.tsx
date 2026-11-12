@@ -62,7 +62,7 @@ export default function BalanceSheetPage() {
     >
       {loading && <p className="text-[12px] text-km-ink-muted">Memuat…</p>}
       {error && (
-        <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}

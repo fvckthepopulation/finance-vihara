@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { Modal } from "@/components/Modal";
 import { Field, Input, Select } from "@/components/Field";
 import { Toast } from "@/components/Toast";
 import { num } from "@/lib/kasBank";
@@ -211,7 +212,7 @@ export default function RekonsiliasiPage() {
     >
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">{error}</p>
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">{error}</p>
       )}
 
       {/* ── 3 kartu ringkasan status ── */}
@@ -702,12 +703,20 @@ function ReklasModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12">
-      <form onSubmit={handleSubmit} className="w-full max-w-[480px] rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium">Reklasifikasi Dana</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg" aria-label="Tutup">✕</button>
+    <Modal
+      title={"Reklasifikasi Dana"}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      width="max-w-[480px]"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+              <Button type="submit" variant="success" disabled={pending}>
+                {pending ? "Menyimpan…" : "Simpan Reklasifikasi"}
+              </Button>
         </div>
+      }
+    >
         <div className="space-y-3 px-4 py-4">
           <div className="rounded-lg border border-km-blue-soft bg-km-blue-soft px-3 py-2.5 text-[11px] leading-relaxed text-km-blue-ink">
             <strong>{fmtRp(item.amount)}</strong> — {fmtTgl(item.date)}
@@ -738,17 +747,10 @@ function ReklasModal({
             </Select>
           </Field>
           {error && (
-            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">{error}</p>
+            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">{error}</p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="success" disabled={pending}>
-            {pending ? "Menyimpan…" : "Simpan Reklasifikasi"}
-          </Button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
 }
 

@@ -13,6 +13,7 @@ import { listTransactionNames, TransactionName } from "@/lib/transactionNames";
 import { listTransactions, TransactionRow } from "@/lib/transactions";
 import { useAuth } from "@/lib/useAuth";
 import { useVihara } from "@/lib/useVihara";
+import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 
 const fmtRp = (n: string | number) =>
   "Rp " + Math.round(typeof n === "string" ? Number(n) : n).toLocaleString("id-ID");
@@ -34,7 +35,11 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PenerimaanPage() {
   const { user } = useAuth();
-  const { viharaId, fixed, ready: viharaReady } = useVihara();
+  // Header hanya menyaring tabel di bawah form. Vihara transaksi berasal
+  // dari form — alasannya sama dengan Input Pengeluaran.
+  const { viharaId: headerViharaId, ready: viharaReady } = useVihara();
+  const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
+  const viharaId = scope.viharaId;
 
   // ----- form state -----
   const [date, setDate] = useState(today());
@@ -64,18 +69,21 @@ export default function PenerimaanPage() {
     if (user && !receivedByTouched.current) setReceivedBy(user.name);
   }, [user]);
 
-  // Rekening tujuan mengikuti vihara aktif — refetch saat selector berubah.
+  // Rekening tujuan mengikuti vihara yang dipilih DI FORM.
   useEffect(() => {
-    if (!viharaReady) return;
     setDestAccount("");
     if (viharaId == null) {
       setBankAccounts([]);
       return;
     }
+    let alive = true;
     listViharaBankAccounts(viharaId)
-      .then((list) => setBankAccounts(list.filter((b) => b.active)))
-      .catch(() => setBankAccounts([]));
-  }, [viharaId, viharaReady]);
+      .then((list) => alive && setBankAccounts(list.filter((b) => b.active)))
+      .catch(() => alive && setBankAccounts([]));
+    return () => {
+      alive = false;
+    };
+  }, [viharaId]);
 
   // Cascade: kategori → daftar nama penerimaan. Vihara ikut dikirim supaya
   // item khusus satu vihara tidak terbawa ke vihara lain; di halaman ini
@@ -111,19 +119,23 @@ export default function PenerimaanPage() {
       tipe: "Penerimaan",
       from: d,
       to: d,
-      vihara_id: viharaId,
+      vihara_id: headerViharaId,
       per_page: 100,
     })
       .then((res) => setTodayRows(res.data))
       .catch(() => setTodayRows([]))
       .finally(() => setTodayLoading(false));
-  }, [viharaId, viharaReady]);
+  }, [headerViharaId, viharaReady]);
 
   useEffect(() => {
     reloadToday();
   }, [reloadToday]);
 
-  const needVihara = !fixed && viharaId == null;
+  const needVihara = viharaId == null;
+  // Sesuai jawaban Perlu Konfirmasi di FV-9: tahan simpan selagi Jumlah
+  // masih kosong/0, seperti penahan di Input Pengeluaran — kesalahan
+  // tercegah sebelum request terkirim, bukan dijelaskan sesudahnya.
+  const needJumlah = !amount || amount <= 0;
 
   function resetForm() {
     setDate(today());
@@ -140,7 +152,14 @@ export default function PenerimaanPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (needVihara) return;
+    if (scope.entityId == null) {
+      setError("Yayasan wajib dipilih.");
+      return;
+    }
+    if (scope.viharaId == null) {
+      setError("Vihara wajib dipilih.");
+      return;
+    }
     setError(null);
     setPending(true);
     try {
@@ -154,7 +173,8 @@ export default function PenerimaanPage() {
           method === "transfer" && destAccount ? Number(destAccount) : undefined,
         received_by: receivedBy || null,
         description: notes || null,
-        ...(fixed ? {} : { vihara_id: viharaId! }),
+        // Selalu eksplisit: vihara transaksi adalah isi form, bukan header.
+        vihara_id: scope.viharaId,
       });
       await postPenerimaan(created.id);
       setToast("Penerimaan berhasil disimpan");
@@ -180,6 +200,7 @@ export default function PenerimaanPage() {
             subtitle="Pilih kategori dana terlebih dahulu"
           />
           <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-2">
+            <YayasanViharaFields value={scope} onChange={setScope} disabled={pending} />
             <Field label="Tanggal *">
               <Input
                 type="date"
@@ -273,14 +294,14 @@ export default function PenerimaanPage() {
             </div>
           </div>
           {error && (
-            <p className="mx-4 mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+            <p className="mx-4 mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
             </p>
           )}
           <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-            {needVihara && (
+            {(needVihara || needJumlah) && (
               <span className="mr-auto text-[11px] font-medium text-km-amber-ink">
-                Pilih vihara dulu di header
+                {needVihara ? "Pilih yayasan dan vihara dulu" : "Isi jumlah dulu"}
               </span>
             )}
             <Button type="button" variant="ghost" onClick={resetForm}>
@@ -289,7 +310,7 @@ export default function PenerimaanPage() {
             <Button
               type="submit"
               variant="success"
-              disabled={pending || needVihara}
+              disabled={pending || needVihara || needJumlah}
             >
               <svg
                 viewBox="0 0 16 16"

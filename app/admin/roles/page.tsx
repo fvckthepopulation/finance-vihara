@@ -14,6 +14,7 @@ import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
+import { Modal } from "@/components/Modal";
 import { Field, Input } from "@/components/Field";
 
 // Nama role dipakai sebagai kunci di Spatie + dirujuk di kode (mis.
@@ -81,7 +82,7 @@ export default function AdminRolesPage() {
       }
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}
@@ -243,14 +244,30 @@ function RoleEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12">
-      <div className="w-full max-w-2xl rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium text-km-ink">
-            {isNew ? "Role baru" : `Edit permissions — ${role.name}`}
-          </h2>
-          <button onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={isNew ? "Role baru" : `Edit permissions — ${role.name}`}
+      onClose={onClose}
+      width="max-w-2xl"
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[12px] text-km-ink-muted">
+            {selected.size} dari {allPermissions.length} permission dipilih
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleSave}
+              disabled={pending || !canSubmit}
+              data-testid="role-simpan"
+            >
+              {pending ? "Menyimpan…" : isNew ? "Buat role" : "Simpan"}
+            </Button>
+          </div>
         </div>
+      }
+    >
 
         {isNew && (
           <div className="border-b border-km-border px-4 py-3">
@@ -278,7 +295,7 @@ function RoleEditor({
           </div>
         )}
 
-        <div className="max-h-[60vh] overflow-y-auto px-4 py-4">
+      <div className="px-4 py-4">
           {Object.entries(groups).map(([group, perms]) => {
             const allOn = perms.every((p) => selected.has(p));
             return (
@@ -312,30 +329,11 @@ function RoleEditor({
           })}
         </div>
 
-        {error && (
-          <p className="mx-4 mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink" data-testid="role-error">
-            {error}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <p className="text-[12px] text-km-ink-muted">
-            {selected.size} dari {allPermissions.length} permission dipilih
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSave}
-              disabled={pending || !canSubmit}
-              data-testid="role-simpan"
-            >
-              {pending ? "Menyimpan…" : isNew ? "Buat role" : "Simpan"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+      {error && (
+        <p className="mx-4 mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line" data-testid="role-error">
+          {error}
+        </p>
+      )}
+    </Modal>
   );
 }

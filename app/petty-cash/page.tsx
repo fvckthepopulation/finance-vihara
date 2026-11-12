@@ -21,7 +21,7 @@ import {
   PettyCashSummary,
   postPettyCash,
 } from "@/lib/pettyCash";
-import { useVihara } from "@/lib/useVihara";
+import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 
 const fmtRp = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 const fmtTgl = (iso: string) =>
@@ -40,8 +40,15 @@ const picColor = (i: number) => PIC_COLORS[((i % PIC_COLORS.length) + PIC_COLORS
 type ToastMsg = { message: string; tone: "success" | "error" };
 
 export default function PettyCashPage() {
-  const { viharaId, fixed, ready } = useVihara();
-  const needVihara = !fixed && viharaId == null;
+  // Kas Kecil adalah pandangan PER VIHARA — saldo, PIC, dan mutasinya milik
+  // satu vihara. Jadi viharanya dipilih DI HALAMAN INI, bukan diwarisi dari
+  // pemilih di header: saldo yang terlihat dan transaksi yang dicatat harus
+  // menunjuk vihara yang sama, dan harus terbaca jelas yang mana.
+  const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
+  const viharaId = scope.viharaId;
+  const ready = true;
+  const fixed = false;
+  const needVihara = viharaId == null;
 
   const [summary, setSummary] = useState<PettyCashSummary | null>(null);
   const [pics, setPics] = useState<PettyCashPic[]>([]);
@@ -116,6 +123,18 @@ export default function PettyCashPage() {
       {toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />}
 
       <div className="space-y-3.5">
+        {/* ── Vihara yang sedang dikelola ── */}
+        <Card>
+          <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-2">
+            <YayasanViharaFields value={scope} onChange={setScope} />
+          </div>
+          {needVihara && (
+            <p className="border-t border-km-border bg-km-panel-soft px-4 py-2 text-[11px] font-medium text-km-amber-ink">
+              Pilih yayasan dan vihara dulu — saldo dan mutasi di bawah mengikuti pilihan ini.
+            </p>
+          )}
+        </Card>
+
         {/* ── Ringkasan per PIC ── */}
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           {(summary?.pics ?? []).map((p, i) => {

@@ -5,7 +5,7 @@
  * filter PIC Lili di riwayat hanya menampilkan baris Lili.
  */
 import { test, expect, Page, Locator } from "@playwright/test";
-import { login, pickViharaVVG, parseRp } from "../fixtures/auth";
+import { apiToken, login, pickViharaVVG, parseRp, viharaIdsByCode } from "../fixtures/auth";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -25,10 +25,18 @@ async function readSaldo(page: Page, name: string): Promise<number> {
 }
 
 test.describe("v21 kas kecil", () => {
+  let viharaVvg = 0;
+
+  test.beforeAll(async () => {
+    await apiToken("admin");
+    viharaVvg = (await viharaIdsByCode()).VVG;
+  });
+
   test("kartu ringkasan Lili & Epi tampil", async ({ page }) => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/petty-cash");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     await expect(picCard(page, "Lili")).toBeVisible({ timeout: 15_000 });
     await expect(picCard(page, "Epi")).toBeVisible();
@@ -39,6 +47,7 @@ test.describe("v21 kas kecil", () => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/petty-cash");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     const before = await readSaldo(page, "Epi");
 
@@ -66,6 +75,7 @@ test.describe("v21 kas kecil", () => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/petty-cash");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     const before = await readSaldo(page, "Epi");
 
@@ -86,6 +96,7 @@ test.describe("v21 kas kecil", () => {
     await login(page, "admin");
     await pickViharaVVG(page);
     await page.goto("/petty-cash");
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
     const filter = page.getByLabel("Filter PIC");
     await expect(filter).toBeVisible({ timeout: 15_000 });

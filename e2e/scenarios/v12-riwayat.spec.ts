@@ -5,17 +5,26 @@
  * transaksi_vihara.csv, footer menampilkan total Masuk/Keluar.
  */
 import { test, expect } from "@playwright/test";
-import { login, pickViharaVVG } from "../fixtures/auth";
+import { apiToken, login, pickViharaVVG, viharaIdsByCode } from "../fixtures/auth";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
 test.describe("v12 riwayat", () => {
+  let viharaVvg = 0;
+
+  test.beforeAll(async () => {
+    await apiToken("admin");
+    viharaVvg = (await viharaIdsByCode()).VVG;
+  });
+
   test("penerimaan baru muncul di riwayat via pencarian", async ({ page }) => {
     await login(page, "admin");
     await pickViharaVVG(page);
 
     // Buat penerimaan dengan catatan unik.
     await page.goto("/penerimaan");
+    // Vihara transaksi kini dipilih di form, bukan diwarisi dari header.
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
     const catatan = uniq("E2E-RWT");
     await page.getByLabel("Jumlah (Rp) *").fill("67000");
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Perayaan/);

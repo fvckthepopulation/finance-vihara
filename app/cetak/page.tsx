@@ -159,8 +159,8 @@ export default function CetakPage() {
   }, []);
 
   const vihara = viharaId != null ? viharas.find((v) => v.id === viharaId) : undefined;
-  const org = viharaId == null ? YAYASAN : vihara?.name ?? `Vihara #${viharaId}`;
-  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? `V${viharaId}`;
+  const org = viharaId == null ? YAYASAN : vihara?.name ?? "";
+  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? "";
 
   // Ambil transaksi posted sesuai filter — paginasi per_page 200, cap 10 hlm/tipe.
   async function fetchRows(): Promise<{ rows: TransactionRow[]; truncated: boolean }> {
@@ -248,7 +248,7 @@ export default function CetakPage() {
       subtitle="Ringkasan dan detail penerimaan dana seluruh kategori"
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}

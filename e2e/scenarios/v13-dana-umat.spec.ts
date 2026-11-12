@@ -4,13 +4,20 @@
  * penerimaan baru (Dana Paramita) menambah total di tab Dana Paramita.
  */
 import { test, expect } from "@playwright/test";
-import { login, pickViharaVVG, parseRp } from "../fixtures/auth";
+import { apiToken, login, pickViharaVVG, parseRp, viharaIdsByCode } from "../fixtures/auth";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
 const TABS = ["Dana Perayaan", "Dana Operasional", "Dana Bhikkhu", "Dana Paramita"];
 
 test.describe("v13 dana umat", () => {
+  let viharaVvg = 0;
+
+  test.beforeAll(async () => {
+    await apiToken("admin");
+    viharaVvg = (await viharaIdsByCode()).VVG;
+  });
+
   test("4 tab dana render dengan badge transaksi", async ({ page }) => {
     await login(page, "admin");
     await pickViharaVVG(page);
@@ -38,6 +45,8 @@ test.describe("v13 dana umat", () => {
 
     // Buat penerimaan Dana Paramita 77.000.
     await page.goto("/penerimaan");
+    // Vihara transaksi kini dipilih di form, bukan diwarisi dari header.
+    await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
     await page.getByLabel("Jumlah (Rp) *").fill("77000");
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Paramita/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dhammasakacca/);

@@ -10,6 +10,7 @@ import {
 } from "@/lib/masterImport";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
+import { Modal } from "./Modal";
 
 type Props = {
   type: MasterImportType;
@@ -95,15 +96,32 @@ function ImportExcelModal({
   const canCommit = !!file && !!summary && (skipInvalid || !hasInvalid);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-8">
-      <div className="w-full max-w-5xl rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <div>
-            <h2 className="text-[14px] font-medium">Import Excel — {type}</h2>
-            <p className="text-[11px] text-km-ink-muted">Upload .xlsx → preview validasi → commit.</p>
-          </div>
-          <button onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={
+        <span className="flex flex-col">
+          <span>Import Excel — {type}</span>
+          <span className="text-[11px] font-normal text-km-ink-muted">
+            Upload .xlsx → preview validasi → commit.
+          </span>
+        </span>
+      }
+      onClose={onClose}
+      width="max-w-5xl"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          {committed ? (
+            <Button variant="primary" onClick={onDone}>Selesai</Button>
+          ) : (
+            <>
+              <Button variant="default" onClick={onClose}>Batal</Button>
+              <Button variant="primary" onClick={handleCommit} disabled={!canCommit || pending}>
+                {pending ? "…" : `Commit ${summary?.valid ?? 0} baris`}
+              </Button>
+            </>
+          )}
         </div>
+      }
+    >
 
         <div className="space-y-3 px-4 py-4">
           {!committed && (
@@ -194,19 +212,6 @@ function ImportExcelModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          {committed ? (
-            <Button variant="primary" onClick={onDone}>Selesai</Button>
-          ) : (
-            <>
-              <Button variant="default" onClick={onClose}>Batal</Button>
-              <Button variant="primary" onClick={handleCommit} disabled={!canCommit || pending}>
-                {pending ? "…" : `Commit ${summary?.valid ?? 0} baris`}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

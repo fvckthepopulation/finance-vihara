@@ -32,6 +32,12 @@ test.describe("v30 rbac", () => {
     await expect(page.getByText("Pilih vihara dulu di header")).toHaveCount(0);
     await expect(page.getByLabel("Jumlah (Rp) *")).toBeEnabled();
     await expect(page.getByLabel("Kategori Dana *")).toBeEnabled();
+    // Vihara terisi sendiri karena bendahara hanya memegang satu.
+    await expect(page.getByTestId("form-vihara")).not.toHaveValue("");
+    // Simpan sengaja masih tertahan sampai Jumlah diisi (penahan FV-9);
+    // yang diuji di sini: tidak ada lagi blokir "pilih vihara dulu".
+    await expect(page.getByText("Pilih yayasan dan vihara dulu")).toHaveCount(0);
+    await page.getByLabel("Jumlah (Rp) *").fill("10000");
     await expect(page.getByRole("button", { name: "Simpan Penerimaan" })).toBeEnabled();
   });
 });

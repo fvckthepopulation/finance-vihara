@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, Select, Textarea } from "@/components/Field";
+import { Modal } from "@/components/Modal";
 import { CoaAccount, listCoa } from "@/lib/coa";
 import {
   CreateJournalEntryPayload,
@@ -87,7 +88,7 @@ export default function JurnalPage() {
       }
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}
@@ -293,12 +294,20 @@ function ManualJournalForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12 overflow-y-auto">
-      <form onSubmit={submit} className="w-full max-w-3xl rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium text-km-ink">Manual Journal Entry</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={"Manual Journal Entry"}
+      onClose={onClose}
+      onSubmit={submit}
+      width="max-w-3xl"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+              <Button type="submit" variant="primary" disabled={pending || !balanced}>
+                {pending ? "Menyimpan…" : "Simpan draft"}
+              </Button>
         </div>
+      }
+    >
 
         <div className="space-y-3 px-4 py-4">
           <div className="grid grid-cols-3 gap-3">
@@ -397,20 +406,13 @@ function ManualJournalForm({
           </div>
 
           {error && (
-            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
             </p>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={pending || !balanced}>
-            {pending ? "Menyimpan…" : "Simpan draft"}
-          </Button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
 }
 
@@ -429,15 +431,19 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
   }, [id]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium text-km-ink">JE #{id}</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={`JE #${id}`}
+      onClose={onClose}
+      width="max-w-2xl"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="default" onClick={onClose}>Tutup</Button>
         </div>
+      }
+    >
         <div className="space-y-3 px-4 py-4">
           {error && (
-            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
             </p>
           )}
@@ -477,11 +483,7 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
             </>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Tutup</Button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -17,6 +17,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { ImportExcelButton } from "@/components/ImportExcelButton";
 import { Card } from "@/components/Card";
+import { Modal } from "@/components/Modal";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { Pagination } from "@/components/Pagination";
 
@@ -100,7 +101,7 @@ export default function CoaPage() {
       }
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}
@@ -282,17 +283,20 @@ function CoaForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-lg rounded-xl border border-km-border bg-km-panel shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium text-km-ink">
-            {isEdit ? `Edit ${account!.code}` : "Akun baru"}
-          </h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={isEdit ? `Edit ${account!.code}` : "Akun baru"}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      width="max-w-lg"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+              <Button type="submit" variant="primary" disabled={pending}>
+                {pending ? "Menyimpan…" : "Simpan"}
+              </Button>
         </div>
+      }
+    >
 
         <div className="space-y-3 px-4 py-4">
           <div className="grid grid-cols-2 gap-3">
@@ -378,21 +382,15 @@ function CoaForm({
           )}
 
           {error && (
-            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
             </p>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "Menyimpan…" : "Simpan"}
-          </Button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
+
 }
 
 function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {

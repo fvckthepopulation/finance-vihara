@@ -13,6 +13,7 @@ import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { Modal } from "@/components/Modal";
 import { Field, Input, Textarea } from "@/components/Field";
 import { ImportExcelButton } from "@/components/ImportExcelButton";
 import { Pagination } from "@/components/Pagination";
@@ -64,7 +65,7 @@ export default function EntitiesPage() {
       ) : null}
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">{error}</p>
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">{error}</p>
       )}
 
       {loading && <p className="text-[12px] text-km-ink-muted">Memuat…</p>}
@@ -163,12 +164,18 @@ function EntityForm({ item, onClose, onSaved }: { item: MasterEntity | null; onC
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12">
-      <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl border border-km-border bg-km-panel shadow-xl">
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium">{isEdit ? `Edit ${item!.code}` : "Entitas baru"}</h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={isEdit ? `Edit ${item!.code}` : "Entitas baru"}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      width="max-w-md"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+              <Button type="submit" variant="primary" disabled={pending}>{pending ? "…" : "Simpan"}</Button>
         </div>
+      }
+    >
         <div className="space-y-3 px-4 py-4">
           <Field label="Kode (UPPERCASE, max 8)"><Input required value={e.code} onChange={(ev) => setE({ ...e, code: ev.target.value.toUpperCase() })} placeholder="PGS" className="font-mono" /></Field>
           <Field label="Nama Legal"><Input required value={e.legal_name} onChange={(ev) => setE({ ...e, legal_name: ev.target.value })} placeholder="PT Persatuan Gula Sentosa" /></Field>
@@ -178,13 +185,9 @@ function EntityForm({ item, onClose, onSaved }: { item: MasterEntity | null; onC
             <input type="checkbox" checked={e.active} onChange={(ev) => setE({ ...e, active: ev.target.checked })} className="h-3.5 w-3.5 accent-km-blue" />
             <span>Active</span>
           </label>
-          {error && <div className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">{error}</div>}
+          {error && <div className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">{error}</div>}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={pending}>{pending ? "…" : "Simpan"}</Button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
+
 }

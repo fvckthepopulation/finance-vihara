@@ -1,68 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { listViharas, Vihara } from "@/lib/vihara";
 import { useVihara } from "@/lib/useVihara";
 import { useAuth } from "@/lib/useAuth";
+import { useScopeNames } from "@/lib/useScopeNames";
 
 // Pemilih vihara di topbar, mengikuti hirarki akses:
 //   - mode yayasan tunggal      -> tidak tampil sama sekali;
 //   - user terkunci 1 vihara    -> chip label statis nama viharanya;
 //   - user >1 vihara / yayasan  -> <select> berisi HANYA vihara yang boleh
-//                                  diakses (API /api/viharas sudah ter-scope,
-//                                  jadi daftar ini tidak pernah bocor).
-
-let viharaCache: Vihara[] | null = null;
-let viharaPending: Promise<Vihara[]> | null = null;
-
-export function resetViharaCache() {
-  viharaCache = null;
-  viharaPending = null;
-}
-
-async function loadAllViharas(): Promise<Vihara[]> {
-  if (viharaCache) return viharaCache;
-  if (!viharaPending) {
-    viharaPending = (async () => {
-      const all: Vihara[] = [];
-      let page = 1;
-      // Paginator Laravel — ambil semua halaman (dibatasi 10 utk jaga-jaga).
-      for (;;) {
-        const res = await listViharas({ page });
-        all.push(...res.data);
-        if (page >= res.last_page || page >= 10) break;
-        page += 1;
-      }
-      viharaCache = all;
-      return all;
-    })().finally(() => {
-      viharaPending = null;
-    });
-  }
-  return viharaPending;
-}
+//                                  diakses (/api/my-scope sudah dibatasi ke
+//                                  jangkauan akun, jadi tidak pernah bocor).
 
 export function ViharaSelector() {
   const { viharaId, fixed, allowedIds, selectable, ready, setViharaId } = useVihara();
   const { user } = useAuth();
-  const [viharas, setViharas] = useState<Vihara[]>(viharaCache ?? []);
+  // Nama diambil dari jangkauan akses akun, bukan dari katalog master:
+  // /api/viharas butuh izin `masters.view` yang banyak role operasional
+  // tidak punya, dan dulu itu membuat badge ini berbunyi "Vihara #1".
+  const { viharas, viharaName } = useScopeNames();
 
   const singleEntityMode = user?.app?.single_entity_mode ?? false;
-
-  useEffect(() => {
-    if (!ready || singleEntityMode) return;
-    let alive = true;
-    loadAllViharas()
-      .then((v) => {
-        if (alive) setViharas(v);
-      })
-      .catch(() => {
-        // Daftar bisa ditolak — chip tetap punya fallback di bawah.
-      });
-    return () => {
-      alive = false;
-    };
-  }, [ready, singleEntityMode]);
 
   if (!ready) return null;
 
@@ -70,8 +27,10 @@ export function ViharaSelector() {
   if (singleEntityMode) return null;
 
   if (fixed) {
-    const name =
-      viharas.find((v) => v.id === viharaId)?.name ?? `Vihara #${viharaId}`;
+    // Selagi nama belum sampai, jangan tampilkan penanda darurat berisi id —
+    // itu justru yang dikeluhkan. Chip menunggu sebentar.
+    const name = viharaName(viharaId);
+    if (!name) return null;
     return (
       <span
         data-testid="vihara-fixed"

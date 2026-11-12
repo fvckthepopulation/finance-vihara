@@ -88,8 +88,8 @@ export default function LaporanPage() {
   const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
   const periodeLabel = isak35PeriodLabel(mode, year, month);
   const vihara = viharaId != null ? viharas.find((v) => v.id === viharaId) : undefined;
-  const org = viharaId == null ? YAYASAN : vihara?.name ?? `Vihara #${viharaId}`;
-  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? `V${viharaId}`;
+  const org = viharaId == null ? YAYASAN : vihara?.name ?? "";
+  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? "";
 
   async function handleExport() {
     if (!data || exporting) return;
@@ -157,7 +157,7 @@ export default function LaporanPage() {
       actions={periodSelector}
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}

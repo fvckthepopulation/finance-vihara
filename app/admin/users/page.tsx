@@ -19,6 +19,7 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field, Input, Select } from "@/components/Field";
+import { Modal } from "@/components/Modal";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -74,7 +75,7 @@ export default function AdminUsersPage() {
       }
     >
       {error && (
-        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+        <p className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </p>
       )}
@@ -237,17 +238,19 @@ function UserForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-12">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-xl border border-km-border bg-km-panel shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-km-border px-4 py-3">
-          <h2 className="text-[14px] font-medium text-km-ink">
-            {user ? `Edit ${user.name}` : "User baru"}
-          </h2>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-km-ink-muted hover:bg-km-bg">✕</button>
+    <Modal
+      title={user ? `Edit ${user.name}` : "User baru"}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            {pending ? "Menyimpan…" : "Simpan"}
+          </Button>
         </div>
+      }
+    >
 
         <div className="space-y-3 px-4 py-4">
           <Field label="Nama">
@@ -354,20 +357,13 @@ function UserForm({
           </div>
 
           {error && (
-            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+            <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
             </p>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
-          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "Menyimpan…" : "Simpan"}
-          </Button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
 }
 

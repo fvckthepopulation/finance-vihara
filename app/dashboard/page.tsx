@@ -230,7 +230,7 @@ export default function DashboardPage() {
       actions={periodSelector}
     >
       {error && (
-        <div className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-4 py-3 text-[12px] text-km-red-ink">
+        <div className="mb-3 rounded-lg border border-km-red bg-km-red-soft px-4 py-3 text-[12px] text-km-red-ink whitespace-pre-line">
           {error}
         </div>
       )}

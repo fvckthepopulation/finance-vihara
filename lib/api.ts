@@ -14,6 +14,31 @@ export function clearToken(): void {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * Rangkai pesan error yang terbaca dari balasan API.
+ *
+ * Laravel mengirim `message` berisi error PERTAMA saja, ditambah imbuhan
+ * "(and 4 more errors)". Kalau itu yang ditampilkan, pengguna hanya tahu satu
+ * dari lima field yang salah dan harus menebak sisanya satu per satu. Di sini
+ * seluruh pesan di `errors` dirangkai, satu baris per field.
+ */
+function pesanDari(payload: unknown, status: number): string {
+  if (typeof payload === "object" && payload !== null) {
+    const p = payload as { message?: unknown; errors?: unknown };
+    if (p.errors && typeof p.errors === "object") {
+      const semua = Object.values(p.errors as Record<string, unknown>)
+        .flatMap((v) => (Array.isArray(v) ? v : [v]))
+        .map((v) => String(v))
+        .filter(Boolean);
+      // Duplikat muncul saat satu aturan menandai dua field sekaligus.
+      const unik = [...new Set(semua)];
+      if (unik.length) return unik.join("\n");
+    }
+    if (p.message) return String(p.message);
+  }
+  return `HTTP ${status}`;
+}
+
 export async function api<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -37,11 +62,7 @@ export async function api<T = unknown>(
     } catch {
       payload = await res.text();
     }
-    const error = new Error(
-      typeof payload === "object" && payload && "message" in payload
-        ? String((payload as { message?: unknown }).message)
-        : `HTTP ${res.status}`,
-    );
+    const error = new Error(pesanDari(payload, res.status));
     (error as Error & { payload?: unknown }).payload = payload;
     (error as Error & { status?: number }).status = res.status;
     throw error;
@@ -132,4 +153,17 @@ export async function logout(): Promise<void> {
 
 export function me(): Promise<AuthUser> {
   return api<AuthUser>("/api/me");
+}
+
+/**
+ * Jangkauan akses akun untuk BERTRANSAKSI — yayasan & vihara yang boleh
+ * dipakai. Sengaja bukan /api/entities + /api/viharas: keduanya master data
+ * dan butuh izin `entities.view` / `masters.view`, yang banyak role
+ * operasional tidak punya. Form transaksi tidak boleh bergantung ke sana.
+ */
+export type ScopeEntity = { id: number; code: string; legal_name: string };
+export type ScopeVihara = { id: number; code: string; name: string; entity_id: number | null };
+
+export function getMyScope(): Promise<{ entities: ScopeEntity[]; viharas: ScopeVihara[] }> {
+  return api<{ entities: ScopeEntity[]; viharas: ScopeVihara[] }>("/api/my-scope");
 }

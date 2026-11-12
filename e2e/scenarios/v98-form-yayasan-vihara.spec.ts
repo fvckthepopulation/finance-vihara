@@ -25,6 +25,8 @@ const KODE_YAYASAN = `F${stamp}`.slice(0, 8);
 let adminToken = "";
 let yayasanBaruId = 0;
 let viharaBaruId = 0;
+let roleBaruId = 0;
+let userBaruId = 0;
 let viharaYdi: Record<string, number> = {};
 let yayasanYdiId = 0;
 
@@ -42,6 +44,14 @@ test.describe("v98 form yayasan-vihara", () => {
   });
 
   test.afterAll(async () => {
+    // Urutan penting: user dulu, baru role; API menolak menghapus role yang
+    // masih dipakai.
+    if (userBaruId) {
+      await apiCall(adminToken, `/api/admin/users/${userBaruId}`, { method: "DELETE" });
+    }
+    if (roleBaruId) {
+      await apiCall(adminToken, `/api/admin/roles/${roleBaruId}`, { method: "DELETE" });
+    }
     if (viharaBaruId) {
       await apiCall(adminToken, `/api/viharas/${viharaBaruId}`, { method: "DELETE" });
     }
@@ -113,10 +123,19 @@ test.describe("v98 form yayasan-vihara", () => {
     await page.goto("/pembayaran");
     const viharaMulti = page.getByTestId("form-vihara");
     await expect(viharaMulti).toBeEnabled({ timeout: 10_000 });
-    const nilai = await viharaMulti.locator("option").evaluateAll((opts) =>
-      opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean),
-    );
-    expect(nilai.sort()).toEqual([String(viharaYdi.VVG), String(viharaYdi.VAD)].sort());
+    // Opsi vihara dimuat async setelah select aktif — tunggu sampai terisi,
+    // jangan baca isinya sekali begitu select enabled (dulu flaky: terbaca []).
+    await expect
+      .poll(
+        async () =>
+          (
+            await viharaMulti.locator("option").evaluateAll((opts) =>
+              opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean),
+            )
+          ).sort(),
+        { timeout: 10_000 },
+      )
+      .toEqual([String(viharaYdi.VVG), String(viharaYdi.VAD)].sort());
   });
 
   test("ganti yayasan mengosongkan vihara dan rekening", async ({ page }) => {
@@ -157,10 +176,13 @@ test.describe("v98 form yayasan-vihara", () => {
     await fRekening.selectOption({ index: 1 });
     await expect(fRekening).not.toHaveValue("");
 
-    // Pindah yayasan: vihara DAN rekening ikut kosong, karena keduanya
-    // milik yayasan lama.
+    // Pindah yayasan: vihara lama DAN rekeningnya dilepas, karena keduanya
+    // milik yayasan lama. Yayasan baru ini hanya punya satu vihara, jadi
+    // vihara itu langsung terpilih sendiri — yang penting vihara lama tidak
+    // tertinggal, dan rekening ikut kosong.
     await fYayasan.selectOption(String(yayasanBaruId));
-    await expect(fVihara).toHaveValue("");
+    await expect(fVihara).not.toHaveValue(String(viharaYdi.VVG));
+    await expect(fVihara).toHaveValue(String(viharaBaruId));
     await expect(fRekening).toHaveValue("");
 
     // Daftar vihara ikut berganti ke yayasan yang baru.
@@ -213,5 +235,72 @@ test.describe("v98 form yayasan-vihara", () => {
       `/api/viharas/${viharaYdi.VVG}`,
     );
     expect(terakhir.entity_id).toBe(viharaVvg.body.entity_id);
+  });
+
+  test("role tanpa izin master tetap bisa memakai form transaksi", async ({ page }) => {
+    // Inti FV-12: role operasional buatan tangan sering tidak diberi
+    // `entities.view` / `masters.view`. Dulu form mengambil yayasan & vihara
+    // dari endpoint master itu, jadi dropdownnya terkunci DAN kosong —
+    // akun yang jelas punya satu vihara tidak bisa bertransaksi sama sekali.
+    const namaRole = `e2e_ops_${stamp}`;
+    const email = `${namaRole}@uji.test`;
+
+    const role = await apiCall<Dibuat>(adminToken, "/api/admin/roles", {
+      method: "POST",
+      body: JSON.stringify({
+        name: namaRole,
+        permissions: ["pembayaran.view", "pembayaran.create", "cash.view"],
+      }),
+    });
+    expect(role.status).toBe(201);
+    roleBaruId = role.body.id;
+
+    const user = await apiCall<Dibuat>(adminToken, "/api/admin/users", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Operasional Uji",
+        email,
+        password: "password123",
+        role: namaRole,
+        entity_id: yayasanYdiId,
+        scope_type: "vihara",
+        vihara_ids: [viharaYdi.VVG],
+      }),
+    });
+    expect(user.status).toBe(201);
+    userBaruId = user.body.id;
+
+    // Endpoint master memang tertutup baginya — itu wajar dan tetap begitu.
+    const token = await apiToken({ email, password: "password123" });
+    expect((await apiCall(token, "/api/entities")).status).toBe(403);
+    expect((await apiCall(token, "/api/viharas")).status).toBe(403);
+
+    // Tapi jangkauan aksesnya sendiri boleh dibaca, tanpa izin tambahan.
+    const scope = await apiCall<{ entities: unknown[]; viharas: Array<{ id: number }> }>(
+      token,
+      "/api/my-scope",
+    );
+    expect(scope.status).toBe(200);
+    expect(scope.body.viharas.map((v) => v.id)).toEqual([viharaYdi.VVG]);
+
+    // Dan di layar: kedua field BISA dibuka, terisi, bukan kosong terkunci.
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill("password123");
+    await page.getByRole("button", { name: "Masuk" }).click();
+    await page.waitForURL("**/dashboard");
+    await page.goto("/pembayaran");
+
+    const fYayasan = page.getByTestId("form-yayasan");
+    const fVihara = page.getByTestId("form-vihara");
+    await expect(fYayasan).toBeEnabled({ timeout: 10_000 });
+    await expect(fVihara).toBeEnabled();
+    await expect(fYayasan).toHaveValue(String(yayasanYdiId));
+    await expect(fVihara).toHaveValue(String(viharaYdi.VVG));
+
+    // Field yang bergantung padanya pun terisi, bukan buntu.
+    await expect
+      .poll(async () => (await page.getByTestId("form-rekening").locator("option").count()) > 1)
+      .toBe(true);
   });
 });
