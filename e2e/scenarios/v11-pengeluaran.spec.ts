@@ -147,6 +147,8 @@ test.describe("v11 pengeluaran", () => {
       "Debet Dana",
       "Rekening",
       "Jumlah",
+      // Kolom aksi menyusul bersama tombol Detail (FV-15).
+      "Aksi",
     ]);
 
     // Dan isinya benar-benar terisi, bukan kolom kosong.

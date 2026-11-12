@@ -6,6 +6,8 @@ import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, Select, Textarea } from "@/components/Field";
+import { fmtTanggal } from "@/lib/tanggal";
+import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { Modal } from "@/components/Modal";
 import { CoaAccount, listCoa } from "@/lib/coa";
 import {
@@ -46,6 +48,8 @@ export default function JurnalPage() {
   const [entities, setEntities] = useState<MasterEntity[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [viewId, setViewId] = useState<number | null>(null);
+  // FV-18 poin 4: dari jurnal bisa membuka detail transaksi sumbernya.
+  const [sumberId, setSumberId] = useState<number | null>(null);
 
   function reload() {
     setLoading(true);
@@ -153,6 +157,7 @@ export default function JurnalPage() {
               <tr>
                 <Th>Tanggal</Th>
                 <Th>Sumber</Th>
+                <Th>Vihara</Th>
                 <Th>Deskripsi</Th>
                 <Th>Akun (COA)</Th>
                 <Th className="text-right">Debit</Th>
@@ -163,23 +168,44 @@ export default function JurnalPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={8} className="px-3 py-6 text-center text-km-ink-muted">Memuat…</td></tr>
+                <tr><td colSpan={9} className="px-3 py-6 text-center text-km-ink-muted">Memuat…</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">Belum ada jurnal.</td></tr>
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">Belum ada jurnal.</td></tr>
               )}
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-km-border hover:bg-km-panel-soft">
-                  <Td>{r.entry_date}</Td>
+                  <Td className="whitespace-nowrap">{fmtTanggal(r.entry_date)}</Td>
                   <Td>
                     <Badge tone={r.reference_type === "manual" ? "info" : "neutral"}>
-                      {journalSourceLabel(r.reference_type)}
+                      {r.source?.label ?? journalSourceLabel(r.reference_type)}
                     </Badge>
+                    {r.source?.code && (
+                      <p className="mt-0.5 font-mono text-[10.5px] text-km-ink-muted">
+                        {r.source.code}
+                      </p>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-[11px]">
+                    {r.vihara?.name ?? "—"}
                   </Td>
                   <Td>
-                    <p className="font-medium">{r.description}</p>
-                    {r.reference && (
-                      <p className="text-[11px] text-km-ink-muted">ref: {r.reference}</p>
+                    {/* Deskripsi tersimpan hanya memuat kode + nama kategori,
+                        yang sama untuk semua transaksi sejenis. Informasi
+                        pembedanya diambil dari transaksi sumbernya. */}
+                    <p className="font-medium">{r.source?.name ?? r.description}</p>
+                    {(r.source?.counterparty || r.source?.reference || r.reference) && (
+                      <p className="text-[11px] text-km-ink-muted">
+                        {[
+                          r.source?.counterparty,
+                          r.source?.reference ?? r.reference,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+                    {r.source?.name && (
+                      <p className="text-[10.5px] text-km-ink-muted">{r.description}</p>
                     )}
                   </Td>
                   <Td className="text-[11px] text-km-ink-muted font-mono">
@@ -206,12 +232,28 @@ export default function JurnalPage() {
                     </Badge>
                   </Td>
                   <Td className="text-right">
-                    <button
+                    {/* Tombol sebelumnya hanya teks kecil; kini tombol
+                        sungguhan dengan tinggi klik memadai dan berlabel. */}
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="mr-2 min-h-[32px]"
                       onClick={() => setViewId(r.id)}
-                      className="mr-2 text-[11px] text-km-blue hover:underline"
+                      data-testid={`detail-je-${r.id}`}
                     >
-                      Lihat
-                    </button>
+                      Detail
+                    </Button>
+                    {r.source?.type === "pembayaran" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="min-h-[32px]"
+                        onClick={() => setSumberId(r.source!.id)}
+                        data-testid={`sumber-je-${r.id}`}
+                      >
+                        Transaksi
+                      </Button>
+                    )}
                     {canCreate && r.reference_type === "manual" && r.status === "draft" && (
                       <button
                         onClick={() => handleDelete(r)}
@@ -254,6 +296,9 @@ export default function JurnalPage() {
 
       {viewId != null && (
         <ViewJournalModal id={viewId} onClose={() => setViewId(null)} />
+      )}
+      {sumberId != null && (
+        <PembayaranDetail id={sumberId} onClose={() => setSumberId(null)} />
       )}
     </AppShell>
   );

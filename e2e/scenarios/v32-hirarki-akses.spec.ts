@@ -377,4 +377,41 @@ test.describe("v32 hirarki akses", () => {
       await apiCall(admin, `/api/admin/users/${dibuat.body.id}`, { method: "DELETE" });
     }
   });
+
+  test("daftar jurnal ikut hirarki, termasuk detailnya", async () => {
+    // FV-16: index dan show di ManualJournalController sama sekali tidak
+    // lewat ViharaScopeService, jadi pemegang scope vihara melihat jurnal
+    // vihara lain — termasuk jurnal otomatis dari pembayaran/penerimaan
+    // mereka, yang berarti nominal dan keterangannya ikut terbaca.
+    type Jurnal = { id: number; vihara?: { id: number; code: string } | null };
+    const kode = await viharaIdsByCode();
+
+    const tokenVvg = await apiToken("bendahara");
+    const daftar = await apiCall<{ data: Jurnal[] }>(
+      tokenVvg,
+      "/api/journal-entries?per_page=100",
+    );
+    expect(daftar.status).toBe(200);
+    const kodeTerlihat = new Set(
+      daftar.body.data.map((j) => j.vihara?.code ?? "yayasan"),
+    );
+    expect([...kodeTerlihat].sort()).toEqual(["VVG"]);
+
+    // Pemegang scope yayasan tetap melihat seluruh viharanya.
+    const tokenYayasan = await apiToken("adminYayasan");
+    const daftarYayasan = await apiCall<{ data: Jurnal[] }>(
+      tokenYayasan,
+      "/api/journal-entries?per_page=100",
+    );
+    const kodeYayasan = new Set(
+      daftarYayasan.body.data.map((j) => j.vihara?.code ?? "yayasan"),
+    );
+    expect(kodeYayasan.size).toBeGreaterThan(1);
+
+    // Detail jurnal vihara lain ditolak, bukan sekadar tidak terdaftar.
+    const milikVad = daftarYayasan.body.data.find((j) => j.vihara?.id === kode.VAD);
+    expect(milikVad, "perlu satu jurnal VAD untuk diuji").toBeTruthy();
+    const dicuri = await apiCall(tokenVvg, `/api/journal-entries/${milikVad!.id}`);
+    expect(dicuri.status).toBe(403);
+  });
 });

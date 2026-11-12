@@ -75,6 +75,13 @@ export type Pembayaran = {
   created_at: string;
   updated_at: string;
   entity?: { id: number; code: string; legal_name: string };
+  vihara?: { id: number; code: string; name: string } | null;
+  /** Nama pengeluaran dari master transaction_names. */
+  name?: string | null;
+  bank_account?: { id: number; bank_name: string; account_number: string } | null;
+  approved_by_name?: string | null;
+  voided_at?: string | null;
+  void_reason?: string | null;
   payee?: { id: number; code: string; name: string } | null;
   source_account?: { code: string; name: string };
   debit_account?: { code: string; name: string };

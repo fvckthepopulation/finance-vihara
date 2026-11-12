@@ -15,7 +15,23 @@ export type JournalEntryRow = {
   entry_date: string;
   reference_type: string;
   description: string;
+  /** Vihara asal jurnal; null untuk jurnal tingkat yayasan. */
+  vihara?: { id: number; code: string; name: string } | null;
   reference?: string | null;
+  /**
+   * Ringkasan transaksi sumber (null untuk jurnal manual). Diambil server
+   * dari baris sumbernya, bukan dari teks deskripsi — supaya jurnal lama
+   * pun menampilkan informasi pembeda.
+   */
+  source?: {
+    type: "pembayaran" | "penerimaan" | "petty_cash";
+    label: string;
+    code: string | null;
+    name: string | null;
+    counterparty: string | null;
+    reference: string | null;
+    id: number;
+  } | null;
   total_debit: string;
   total_credit: string;
   /** cancelled = dibatalkan lewat jurnal pembalik; barisnya tetap ada. */

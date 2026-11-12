@@ -23,6 +23,9 @@ const ROLE_PENYETUJU = `e2e_setuju_${stamp}`;
 const EMAIL_PENCATAT = `${ROLE_PENCATAT}@uji.test`;
 const EMAIL_PENYETUJU = `${ROLE_PENYETUJU}@uji.test`;
 const PASSWORD = "password123";
+// Penanda unik per-run. Tanpa ini, draft bernominal sama dari run sebelumnya
+// ikut tersaring dan asersi "sudah tidak ada" gagal di suite penuh.
+const BUKTI = `E2E-SETUJU-${stamp}`;
 
 let adminToken = "";
 let viharaVvg = 0;
@@ -94,6 +97,7 @@ test.describe("v39 persetujuan", () => {
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
     await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await page.getByLabel("No. Bukti / Referensi").fill(BUKTI);
     await simpan.click();
 
     await expect(page.getByText(/Tersimpan sebagai draft/)).toBeVisible({ timeout: 10_000 });
@@ -115,7 +119,7 @@ test.describe("v39 persetujuan", () => {
     await expect(page.locator('a[href="/persetujuan"]').first()).toBeVisible();
     await page.goto("/persetujuan");
 
-    const baris = page.locator("tbody tr").filter({ hasText: "55.000" }).first();
+    const baris = page.locator("tbody tr").filter({ hasText: BUKTI }).first();
     await expect(baris).toBeVisible({ timeout: 10_000 });
 
     const setujui = baris.locator('[data-testid^="setujui-"]');
@@ -124,15 +128,15 @@ test.describe("v39 persetujuan", () => {
 
     // Hilang dari daftar tunggu karena sudah diposting.
     await expect(
-      page.locator("tbody tr").filter({ hasText: "55.000" }),
+      page.locator("tbody tr").filter({ hasText: BUKTI }),
     ).toHaveCount(0, { timeout: 10_000 });
 
     // Dan benar-benar posted di server.
-    const daftar = await apiCall<{ data: Array<{ amount: string; status: string }> }>(
+    const daftar = await apiCall<{ data: Array<{ reference: string | null; status: string }> }>(
       adminToken,
       `/api/transactions?vihara_id=${viharaVvg}&per_page=100&tipe=Pengeluaran`,
     );
-    const baru = daftar.body.data.find((r) => Number(r.amount) === 55000);
+    const baru = daftar.body.data.find((r) => r.reference === BUKTI);
     expect(baru?.status).toBe("posted");
   });
 

@@ -167,7 +167,16 @@ export default function PersetujuanPage() {
                       </span>
                     </Td>
                     <Td className="whitespace-nowrap">{r.vihara_name ?? "—"}</Td>
-                    <Td>{r.name ?? "—"}</Td>
+                    <Td>
+                      {/* No. Bukti ikut ditampilkan: penyetuju mencocokkan
+                          draft dengan kuitansi fisiknya lewat nomor ini. */}
+                      <p>{r.name ?? "—"}</p>
+                      {(r.counterparty || r.reference) && (
+                        <p className="text-[11px] text-km-ink-muted">
+                          {[r.counterparty, r.reference].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </Td>
                     <Td>
                       <DanaTag category={r.category} label={r.category_label} />
                     </Td>

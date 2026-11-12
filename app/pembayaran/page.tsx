@@ -8,6 +8,7 @@ import { DanaTag, DANA_CATEGORY_LABEL, debetDanaCategory } from "@/components/Da
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
 import { Toast } from "@/components/Toast";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
+import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasBank";
 import {
   createPembayaran,
@@ -53,6 +54,7 @@ export default function PembayaranPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   // Input file tidak terkendali React; perlu ref untuk mengosongkannya.
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -409,18 +411,19 @@ export default function PembayaranPage() {
                 <Th>Debet Dana</Th>
                 <Th>Rekening</Th>
                 <Th className="text-right">Jumlah</Th>
+                <Th>Aksi</Th>
               </tr>
             </thead>
             <tbody>
               {todayLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : todayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
                     Belum ada pengeluaran hari ini
                   </td>
                 </tr>
@@ -442,6 +445,17 @@ export default function PembayaranPage() {
                     <Td className="text-right font-mono tabular-nums font-medium text-km-red">
                       {fmtRp(r.amount)}
                     </Td>
+                    <Td>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="min-h-[32px]"
+                        onClick={() => setDetailId(r.id)}
+                        data-testid={`detail-pengeluaran-${r.id}`}
+                      >
+                        Detail
+                      </Button>
+                    </Td>
                   </tr>
                 ))
               )}
@@ -449,6 +463,9 @@ export default function PembayaranPage() {
           </table>
         </div>
       </Card>
+      {detailId != null && (
+        <PembayaranDetail id={detailId} onClose={() => setDetailId(null)} />
+      )}
     </AppShell>
   );
 }
