@@ -137,7 +137,7 @@ export default function KasBankPage() {
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-[3px] tabular-nums text-[11px] text-km-ink-muted">{a.account_number}</p>
+                    <p className="mt-[3px] kode text-[11px] text-km-ink-muted">{a.account_number}</p>
                   </div>
                   <span
                     className={`rounded px-2 py-[3px] text-[10px] font-semibold ${

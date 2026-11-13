@@ -138,11 +138,11 @@ export default function MasterPenerimaPage() {
           </Field>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-2.5">
-          <Button size="sm" data-testid="reset-filter" onClick={() => setF({ ...KOSONG })}>
+          <Button data-testid="reset-filter" onClick={() => setF({ ...KOSONG })}>
             Reset filter
           </Button>
           {bisaKelola && (
-            <Button size="sm" variant="primary" data-testid="tambah-penerima" onClick={() => setForm("new")}>
+            <Button variant="primary" data-testid="tambah-penerima" onClick={() => setForm("new")}>
               + Tambah Penerima
             </Button>
           )}

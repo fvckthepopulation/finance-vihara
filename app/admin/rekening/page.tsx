@@ -174,11 +174,11 @@ export default function MasterRekeningPage_() {
           </Field>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-2.5">
-          <Button size="sm" data-testid="reset-filter" onClick={() => setF({ ...KOSONG })}>
+          <Button data-testid="reset-filter" onClick={() => setF({ ...KOSONG })}>
             Reset filter
           </Button>
           {bisaKelola && (
-            <Button size="sm" variant="primary" data-testid="tambah-rekening" onClick={() => setForm("new")}>
+            <Button variant="primary" data-testid="tambah-rekening" onClick={() => setForm("new")}>
               + Tambah Rekening
             </Button>
           )}
@@ -240,7 +240,7 @@ export default function MasterRekeningPage_() {
                     <Td className="whitespace-nowrap tabular-nums">{b.account_number || "—"}</Td>
                     <Td>{b.account_name || "—"}</Td>
                     <Td className="whitespace-nowrap">
-                      <span className="font-mono text-[11px]">{b.coa_account_code ?? "—"}</span>
+                      <span className="kode text-[11px]">{b.coa_account_code ?? "—"}</span>
                       {b.coa_account_name && (
                         <span className="ml-1 text-[11px] text-km-ink-muted">{b.coa_account_name}</span>
                       )}

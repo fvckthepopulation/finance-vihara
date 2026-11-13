@@ -173,12 +173,12 @@ export default function CoaPage() {
                 <tbody>
                   {accounts.map((a) => (
                     <tr key={a.id} className="border-t border-km-border hover:bg-km-panel-soft">
-                      <Td className="font-mono font-medium">{a.code}</Td>
+                      <Td className="kode font-medium">{a.code}</Td>
                       <Td>
                         <p className={a.is_header ? "font-semibold" : ""}>{a.name}</p>
                         {a.note && <p className="text-[10px] text-km-ink-muted">{a.note}</p>}
                       </Td>
-                      <Td className="text-[11px] text-km-ink-muted font-mono">{a.parent_code ?? "—"}</Td>
+                      <Td className="text-[11px] text-km-ink-muted kode">{a.parent_code ?? "—"}</Td>
                       <Td className="text-center">
                         {a.is_header && <Badge tone="info">HDR</Badge>}
                       </Td>
@@ -292,16 +292,16 @@ function CoaForm({
       onSubmit={handleSubmit}
       width="max-w-lg"
       footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-              <Button type="submit" variant="primary" disabled={pending}>
-                {pending ? "Menyimpan…" : "Simpan"}
-              </Button>
-        </div>
+        <>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            {pending ? "Menyimpan…" : "Simpan"}
+          </Button>
+        </>
       }
     >
 
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label={`Kode${isEdit ? " (tidak bisa diubah)" : " — format NNN-NN"}`}>
               <Input
@@ -310,7 +310,7 @@ function CoaForm({
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="500-99"
-                className="font-mono"
+                className="kode"
               />
             </Field>
             <Field label="Tipe">
@@ -340,7 +340,7 @@ function CoaForm({
               value={parentCode}
               onChange={(e) => setParentCode(e.target.value)}
               placeholder="500-00"
-              className="font-mono"
+              className="kode"
             />
           </Field>
 

@@ -187,7 +187,7 @@ function ViharaRow({
   return (
     <>
       <tr className="border-t border-km-border hover:bg-km-panel-soft">
-        <Td className="font-mono">{v.code}</Td>
+        <Td className="kode">{v.code}</Td>
         <Td className="font-medium">{v.name}</Td>
         <Td className="text-[11px] text-km-ink-muted">
           {v.bank_name} {v.bank_account_number}<br />
@@ -498,16 +498,16 @@ function ViharaForm({ item, onClose, onSaved }: { item: Vihara | null; onClose: 
       onSubmit={handleSubmit}
       width="max-w-lg"
       footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-              <Button type="submit" variant="primary" disabled={pending}>
-                {pending ? "Menyimpan…" : "Simpan"}
-              </Button>
-        </div>
+        <>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" disabled={pending}>
+            {pending ? "Menyimpan…" : "Simpan"}
+          </Button>
+        </>
       }
     >
 
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           <Field label="Yayasan penaung">
             <Select
               data-testid="vihara-entity"

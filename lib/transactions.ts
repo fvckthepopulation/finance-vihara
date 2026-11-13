@@ -103,6 +103,22 @@ export function listTransactions(
 }
 
 /**
+ * Daftar per modul — Daftar Pengeluaran dan Daftar Penerimaan (FV-38).
+ *
+ * Datanya sama dengan /api/transactions, izinnya tidak: daftar penerimaan
+ * cukup butuh `penerimaan.view` dan daftar pengeluaran `pembayaran.view`,
+ * bukan `transaksi.view` (menu Semua Transaksi). Server menjaganya per
+ * `tipe`, jadi izin satu modul tidak membuka modul yang lain — karena itu
+ * `tipe` wajib di sini.
+ */
+export function listDaftarTransaksi(
+  params: ListTransactionsParams & { tipe: TransactionTipe },
+): Promise<TransactionsResponse> {
+  const sp = buildQuery(params);
+  return api<TransactionsResponse>(`/api/daftar-transaksi?${sp}`);
+}
+
+/**
  * Antrean persetujuan — data yang sama, endpoint terpisah.
  *
  * /api/transactions dijaga izin `transaksi.view` (FV-28, menu Semua

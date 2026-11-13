@@ -282,23 +282,21 @@ function RoleEditor({
       onClose={onClose}
       width="max-w-2xl"
       footer={
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] text-km-ink-muted">
+        <>
+          <p className="mr-auto text-[12px] text-km-ink-muted">
             {selected.size} dari {allPermissions.length} permission dipilih
           </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSave}
-              disabled={pending || !canSubmit}
-              data-testid="role-simpan"
-            >
-              {pending ? "Menyimpan…" : isNew ? "Buat role" : "Simpan"}
-            </Button>
-          </div>
-        </div>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleSave}
+            disabled={pending || !canSubmit}
+            data-testid="role-simpan"
+          >
+            {pending ? "Menyimpan…" : isNew ? "Buat role" : "Simpan"}
+          </Button>
+        </>
       }
     >
 
@@ -328,7 +326,7 @@ function RoleEditor({
           </div>
         )}
 
-      <div className="px-4 py-4">
+      <div>
           {Object.entries(groups).map(([group, perms]) => {
             const allOn = perms.every((p) => selected.has(p));
             return (

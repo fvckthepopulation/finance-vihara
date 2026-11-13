@@ -81,7 +81,7 @@ export default function EntitiesPage() {
               <Badge tone={e.active ? "success" : "neutral"}>{e.active ? "Active" : "Inactive"}</Badge>
             </div>
             <div className="space-y-1.5 px-4 py-3 text-[12px]">
-              <div className="flex justify-between"><span className="text-km-ink-muted">NPWP</span><span className="font-mono">{e.npwp || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-km-ink-muted">NPWP</span><span className="kode">{e.npwp || "—"}</span></div>
               {e.address && <div><span className="text-km-ink-muted">Alamat:</span> <span>{e.address}</span></div>}
 
               <div className="mt-2 border-t border-km-border pt-2">
@@ -170,16 +170,16 @@ function EntityForm({ item, onClose, onSaved }: { item: MasterEntity | null; onC
       onSubmit={handleSubmit}
       width="max-w-md"
       footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-              <Button type="submit" variant="primary" disabled={pending}>{pending ? "…" : "Simpan"}</Button>
-        </div>
+        <>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" disabled={pending}>{pending ? "…" : "Simpan"}</Button>
+        </>
       }
     >
-        <div className="space-y-3 px-4 py-4">
-          <Field label="Kode (UPPERCASE, max 8)"><Input required value={e.code} onChange={(ev) => setE({ ...e, code: ev.target.value.toUpperCase() })} placeholder="PGS" className="font-mono" /></Field>
+        <div className="space-y-3">
+          <Field label="Kode (UPPERCASE, max 8)"><Input required value={e.code} onChange={(ev) => setE({ ...e, code: ev.target.value.toUpperCase() })} placeholder="PGS" className="kode" /></Field>
           <Field label="Nama Legal"><Input required value={e.legal_name} onChange={(ev) => setE({ ...e, legal_name: ev.target.value })} placeholder="PT Persatuan Gula Sentosa" /></Field>
-          <Field label="NPWP"><Input value={e.npwp} onChange={(ev) => setE({ ...e, npwp: ev.target.value })} className="font-mono" /></Field>
+          <Field label="NPWP"><Input value={e.npwp} onChange={(ev) => setE({ ...e, npwp: ev.target.value })} className="kode" /></Field>
           <Field label="Alamat"><Textarea value={e.address} onChange={(ev) => setE({ ...e, address: ev.target.value })} /></Field>
           <label className="flex items-center gap-1.5 text-[12px]">
             <input type="checkbox" checked={e.active} onChange={(ev) => setE({ ...e, active: ev.target.checked })} className="h-3.5 w-3.5 accent-km-blue" />

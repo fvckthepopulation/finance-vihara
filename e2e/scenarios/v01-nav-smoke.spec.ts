@@ -10,7 +10,9 @@ const PAGES: Array<{ path: string; title: string }> = [
   { path: "/dashboard", title: "Dashboard" },
   { path: "/dana", title: "Penerimaan Dana Umat" },
   { path: "/penerimaan", title: "Input Penerimaan" },
+  { path: "/penerimaan/daftar", title: "Daftar Penerimaan" },
   { path: "/pembayaran", title: "Input Pengeluaran" },
+  { path: "/pengeluaran", title: "Daftar Pengeluaran" },
   { path: "/riwayat", title: "Semua Transaksi" },
   { path: "/cash", title: "Kas & Bank" },
   { path: "/petty-cash", title: "Kas Kecil" },
@@ -25,6 +27,8 @@ const PAGES: Array<{ path: string; title: string }> = [
   { path: "/admin/users", title: "Admin — Users" },
   { path: "/admin/roles", title: "Admin — Roles" },
   { path: "/admin/entities", title: "Master Yayasan" },
+  { path: "/admin/pengeluaran", title: "Master Pengeluaran" },
+  { path: "/admin/penerimaan", title: "Master Penerimaan" },
 ];
 
 async function assertPage(page: Page, path: string, title: string) {

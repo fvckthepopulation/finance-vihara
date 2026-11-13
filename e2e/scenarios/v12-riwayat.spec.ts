@@ -30,8 +30,10 @@ test.describe("v12 riwayat", () => {
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Perayaan/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dana Kathina/);
     await page.getByLabel("Catatan").fill(catatan);
-    await page.getByRole("button", { name: "Simpan Penerimaan" }).click();
-    await expect(page.getByText("Penerimaan berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText("Penerimaan disimpan dan disetujui")).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Cari di riwayat: coba catatan unik dulu, fallback ke nama.
     await page.goto("/riwayat");

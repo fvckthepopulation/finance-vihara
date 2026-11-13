@@ -143,6 +143,8 @@ test.describe("v11 pengeluaran", () => {
       .locator("thead th")
       .allTextContents();
     expect(kolom.map((t) => t.trim())).toEqual([
+      // No. Transaksi jadi kolom pertama sejak FV-40.
+      "No. Transaksi",
       "Tanggal",
       "Vihara",
       "Nama Pengeluaran",
@@ -158,8 +160,9 @@ test.describe("v11 pengeluaran", () => {
     // Dan isinya benar-benar terisi, bukan kolom kosong.
     const baris = page.locator("tbody tr").filter({ hasText: "77.000" }).first();
     await expect(baris).toBeVisible({ timeout: 10_000 });
-    await expect(baris.locator("td").nth(1)).toContainText("Vipassan");
-    await expect(baris.locator("td").nth(5)).toContainText("BCA");
+    await expect(baris.locator("td").nth(0)).toContainText("PAY-");
+    await expect(baris.locator("td").nth(2)).toContainText("Vipassan");
+    await expect(baris.locator("td").nth(6)).toContainText("BCA");
   });
 
   test("dropdown Nama Pengeluaran: urut tanpa bedakan besar-kecil, tanpa singkatan", async ({ page }) => {

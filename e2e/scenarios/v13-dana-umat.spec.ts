@@ -51,8 +51,10 @@ test.describe("v13 dana umat", () => {
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Paramita/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dhammasakacca/);
     await page.getByLabel("Catatan").fill(uniq("E2E-DANA"));
-    await page.getByRole("button", { name: "Simpan Penerimaan" }).click();
-    await expect(page.getByText("Penerimaan berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText("Penerimaan disimpan dan disetujui")).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Reload /dana → total tab bertambah 77.000.
     await page.goto("/dana");

@@ -316,7 +316,7 @@ export default function PersetujuanPage() {
                     className="border-t border-km-border hover:bg-km-panel-soft"
                   >
                     <Td className="whitespace-nowrap">{fmtTanggal(r.date)}</Td>
-                    <Td className="font-mono text-[11px]">{r.code}</Td>
+                    <Td className="kode text-[11px]">{r.code}</Td>
                     <Td>
                       <span
                         className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${

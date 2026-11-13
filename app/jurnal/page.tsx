@@ -189,7 +189,10 @@ export default function JurnalPage() {
                 <Th className="text-right">Debit</Th>
                 <Th className="text-right">Kredit</Th>
                 <Th>Status</Th>
-                <Th></Th>
+                {/* Kolom aksi berjudul dan berlebar tetap (FV-41): tanpa
+                    lebar pasti, tombol Detail bergeser mengikuti aksi kedua
+                    di baris itu, jadi posisinya berbeda per baris. */}
+                <Th className="w-[13.5rem]">Aksi</Th>
               </tr>
             </thead>
             <tbody>
@@ -207,7 +210,7 @@ export default function JurnalPage() {
                       {r.source?.label ?? journalSourceLabel(r.reference_type)}
                     </Badge>
                     {r.source?.code && (
-                      <p className="mt-0.5 font-mono text-[10.5px] text-km-ink-muted">
+                      <p className="mt-0.5 kode text-[10.5px] text-km-ink-muted">
                         {r.source.code}
                       </p>
                     )}
@@ -238,7 +241,7 @@ export default function JurnalPage() {
                       <p className="text-[10.5px] text-km-ink-muted">{r.description}</p>
                     )}
                   </Td>
-                  <Td className="text-[11px] text-km-ink-muted font-mono">
+                  <Td className="text-[11px] text-km-ink-muted kode">
                     {(r.lines ?? []).slice(0, 3).map((l) => l.account_code).join(", ")}
                     {(r.lines?.length ?? 0) > 3 && ` …+${(r.lines?.length ?? 0) - 3}`}
                   </Td>
@@ -261,49 +264,58 @@ export default function JurnalPage() {
                           : "Draft"}
                     </Badge>
                   </Td>
-                  <Td className="text-right">
-                    {/* Tombol sebelumnya hanya teks kecil; kini tombol
-                        sungguhan dengan tinggi klik memadai dan berlabel. */}
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="mr-2 min-h-[32px]"
-                      onClick={() => setViewId(r.id)}
-                      data-testid={`detail-je-${r.id}`}
-                    >
-                      Detail
-                    </Button>
-                    {r.source?.type === "pembayaran" && (
+                  {/* Satu susunan untuk semua baris: Detail selalu di kiri
+                      kolom, aksi kedua selalu di sebelahnya, dan keduanya
+                      tombol — bukan campur tombol dengan teks bergaris bawah
+                      yang tidak terbaca sebagai aksi (FV-41). */}
+                  <Td>
+                    <div className="flex items-center gap-1.5">
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="default"
                         className="min-h-[32px]"
-                        onClick={() => setSumberId(r.source!.id)}
-                        data-testid={`sumber-je-${r.id}`}
+                        onClick={() => setViewId(r.id)}
+                        data-testid={`detail-je-${r.id}`}
                       >
-                        Transaksi
+                        Detail
                       </Button>
-                    )}
-                    {canCreate && r.reference_type === "manual" && r.status === "draft" && (
-                      <button
-                        onClick={() => handleDelete(r)}
-                        className="text-[11px] text-km-red-ink hover:underline"
-                      >
-                        Hapus
-                      </button>
-                    )}
-                    {/* Hanya jurnal MANUAL. Jurnal yang lahir dari
-                        pembayaran/penerimaan dibatalkan lewat transaksinya,
-                        supaya dokumen dan buku besar tidak berbeda. */}
-                    {canVoid && r.reference_type === "manual" && r.status === "posted" && (
-                      <button
-                        onClick={() => handleVoid(r)}
-                        data-testid={`batalkan-je-${r.id}`}
-                        className="text-[11px] text-km-red-ink hover:underline"
-                      >
-                        Batalkan
-                      </button>
-                    )}
+                      {r.source?.type === "pembayaran" && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="min-h-[32px]"
+                          onClick={() => setSumberId(r.source!.id)}
+                          data-testid={`sumber-je-${r.id}`}
+                        >
+                          Transaksi
+                        </Button>
+                      )}
+                      {canCreate && r.reference_type === "manual" && r.status === "draft" && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          className="min-h-[32px]"
+                          onClick={() => handleDelete(r)}
+                          data-testid={`hapus-je-${r.id}`}
+                        >
+                          Hapus
+                        </Button>
+                      )}
+                      {/* Hanya jurnal MANUAL. Jurnal yang lahir dari
+                          pembayaran/penerimaan dibatalkan lewat transaksinya,
+                          supaya dokumen dan buku besar tidak berbeda. */}
+                      {canVoid && r.reference_type === "manual" && r.status === "posted" && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          className="min-h-[32px]"
+                          onClick={() => handleVoid(r)}
+                          data-testid={`batalkan-je-${r.id}`}
+                        >
+                          Batalkan
+                        </Button>
+                      )}
+                    </div>
                   </Td>
                 </tr>
               ))}
@@ -426,16 +438,16 @@ function ManualJournalForm({
       onSubmit={submit}
       width="max-w-3xl"
       footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-              <Button type="submit" variant="primary" disabled={pending || !balanced}>
-                {pending ? "Menyimpan…" : "Simpan draft"}
-              </Button>
-        </div>
+        <>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" disabled={pending || !balanced}>
+            {pending ? "Menyimpan…" : "Simpan draft"}
+          </Button>
+        </>
       }
     >
 
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           {/* Yayasan + Vihara memakai komponen yang sama dengan form transaksi
               (FV-34/FV-35): istilahnya seragam, pilihannya dari /api/my-scope
               sehingga hanya berisi yang boleh diakses, dan satu-satunya
@@ -563,13 +575,9 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
       title={`JE #${id}`}
       onClose={onClose}
       width="max-w-2xl"
-      footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Tutup</Button>
-        </div>
-      }
+      footer={<Button type="button" variant="default" onClick={onClose}>Tutup</Button>}
     >
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           {error && (
             <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
               {error}
@@ -600,7 +608,7 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
                 <tbody>
                   {entry.lines.map((l) => (
                     <tr key={l.id} className="border-t border-km-border">
-                      <Td className="font-mono">{l.account_code}<br /><span className="text-[10.5px] text-km-ink-muted">{l.account?.name}</span></Td>
+                      <Td className="kode">{l.account_code}<br /><span className="text-[10.5px] text-km-ink-muted">{l.account?.name}</span></Td>
                       <Td>{l.description ?? "—"}</Td>
                       <Td className="text-right">{Number(l.debit) > 0 ? fmtRp(l.debit) : "—"}</Td>
                       <Td className="text-right">{Number(l.credit) > 0 ? fmtRp(l.credit) : "—"}</Td>

@@ -48,9 +48,9 @@ test.describe("v10 penerimaan", () => {
     await nama.locator("option", { hasText: "Dana Kathina" }).first().waitFor({ state: "attached" });
 
     // Transfer Bank → Rekening Tujuan muncul dengan BCA + Mandiri.
-    await expect(page.getByLabel("Rekening Tujuan")).toHaveCount(0);
+    await expect(page.getByTestId("form-rekening")).toHaveCount(0);
     await selectByLabelRegex(page.getByLabel("Metode Penerimaan *"), /Transfer Bank/);
-    const rekening = page.getByLabel("Rekening Tujuan");
+    const rekening = page.getByTestId("form-rekening");
     await expect(rekening).toBeVisible();
     // Opsi rekening dimuat async setelah vihara dipilih — tunggu sampai
     // benar-benar terisi, jangan baca isinya begitu select muncul (dulu
@@ -86,9 +86,11 @@ test.describe("v10 penerimaan", () => {
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Perayaan/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dana Kathina/);
     await page.getByLabel("Catatan").fill(catatan);
-    await page.getByRole("button", { name: "Simpan Penerimaan" }).click();
+    await page.getByTestId("tombol-submit").click();
 
-    await expect(page.getByText("Penerimaan berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Penerimaan disimpan dan disetujui")).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Baris baru di card "Penerimaan Hari Ini".
     const row = page.locator("tr", { hasText: "Dana Kathina" }).filter({ hasText: "123.000" });

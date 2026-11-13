@@ -72,19 +72,23 @@ test.describe("v37 pesan validasi", () => {
     }
   });
 
-  test("UI menahan Simpan selagi Jumlah masih kosong", async ({ page }) => {
+  test("UI menahan Ajukan/Submit selagi Jumlah masih kosong", async ({ page }) => {
     await login(page, "admin");
     await page.goto("/penerimaan");
     await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Perayaan/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dana Kathina/);
 
-    const simpan = page.getByRole("button", { name: "Simpan Penerimaan" });
+    // Simpan sebagai Draft tetap boleh — draft memang boleh setengah jadi.
+    const simpan = page.getByTestId("tombol-submit");
     await expect(simpan).toBeDisabled();
+    await expect(page.getByTestId("tombol-ajukan")).toBeDisabled();
+    await expect(page.getByTestId("tombol-draft")).toBeEnabled();
     await expect(page.getByText("Isi jumlah dulu")).toBeVisible();
 
     await page.getByLabel("Jumlah (Rp) *").fill("50000");
     await expect(simpan).toBeEnabled();
+    await expect(page.getByTestId("tombol-ajukan")).toBeEnabled();
     await expect(page.getByText("Isi jumlah dulu")).toHaveCount(0);
   });
 });

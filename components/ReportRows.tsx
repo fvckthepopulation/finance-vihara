@@ -99,7 +99,7 @@ export function LapRow({
           }`}
           style={labelColor ? { color: labelColor } : undefined}
         >
-          {code && <span className="font-mono">{code}</span>}
+          {code && <span className="kode">{code}</span>}
           {code && " · "}
           {label}
         </span>
@@ -165,7 +165,7 @@ export function Row3({
         }`}
         style={{ paddingLeft: 16 + indent * 16, ...(labelColor ? { color: labelColor } : {}) }}
       >
-        {code && <span className="font-mono">{code}</span>}
+        {code && <span className="kode">{code}</span>}
         {code && " · "}
         {label}
       </td>

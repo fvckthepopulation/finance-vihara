@@ -423,11 +423,11 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
                     <Td className="whitespace-nowrap">{fmtTgl(p.date)}</Td>
                     <Td className="whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[10px]">{p.reference}</span>
+                        <span className="kode text-[10px]">{p.reference}</span>
                         {p.km_ref && <KmLink refCode={p.km_ref} />}
                       </div>
                       {p.km_ref && p.km_ref !== p.reference && (
-                        <div className="mt-0.5 font-mono text-[10px] text-km-ink-muted">{p.km_ref}</div>
+                        <div className="mt-0.5 kode text-[10px] text-km-ink-muted">{p.km_ref}</div>
                       )}
                     </Td>
                     <Td>{p.donor}</Td>
@@ -493,7 +493,7 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
               settle.rows.map((s) => (
                 <tr key={s.id} data-testid="pg-settlement-row" className="border-t border-km-border hover:bg-km-panel-soft">
                   <Td className="whitespace-nowrap">{fmtTgl(s.date)}</Td>
-                  <Td className="whitespace-nowrap font-mono text-[10px]">{s.ref}</Td>
+                  <Td className="whitespace-nowrap kode text-[10px]">{s.ref}</Td>
                   <Td className="whitespace-nowrap">{s.donation_count} donasi</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{fmtRp(s.gross)}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums text-km-red">{fmtRp(s.komisi)}</Td>
@@ -757,15 +757,15 @@ function ReklasModal({
       onSubmit={handleSubmit}
       width="max-w-[480px]"
       footer={
-        <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-              <Button type="submit" variant="success" disabled={pending}>
-                {pending ? "Menyimpan…" : "Simpan Reklasifikasi"}
-              </Button>
-        </div>
+        <>
+          <Button type="button" variant="default" onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="success" disabled={pending}>
+            {pending ? "Menyimpan…" : "Simpan Reklasifikasi"}
+          </Button>
+        </>
       }
     >
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           <div className="rounded-lg border border-km-blue-soft bg-km-blue-soft px-3 py-2.5 text-[11px] leading-relaxed text-km-blue-ink">
             <strong>{fmtRp(item.amount)}</strong> — {fmtTgl(item.date)}
             {item.reference ? ` · ${item.reference}` : ""}

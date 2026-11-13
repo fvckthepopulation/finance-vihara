@@ -20,6 +20,14 @@ import { FormEvent, ReactNode } from "react";
 // Jadi yang menggulir selalu isinya, sementara judul dan tombol tetap di
 // tempat. Overlay-nya sendiri juga bisa digulir sebagai jaring pengaman untuk
 // layar yang sangat pendek.
+//
+// Jarak dalam dan tata letak tombol juga diurus DI SINI, bukan oleh tiap
+// pemanggil (FV-39). Dulu padding isi disalin manual per halaman, dan modal
+// yang lupa menyalinnya menempelkan label serta field ke tepi panel sementara
+// judulnya menjorok ke dalam — tidak sejajar. Begitu pula footer: tanpa
+// pembungkus flex, tombol Batal dan Simpan berhimpitan di kiri. Keduanya
+// sekarang punya satu sumber kebenaran; pemanggil hanya mengirim isi dan
+// deretan tombolnya.
 // ============================================================================
 
 export function Modal({
@@ -35,12 +43,18 @@ export function Modal({
   title: ReactNode;
   onClose: () => void;
   children: ReactNode;
-  /** Baris tombol. Selalu terlihat, tidak ikut menggulir. */
+  /**
+   * Deretan tombol. Selalu terlihat, tidak ikut menggulir. Dirapikan sendiri
+   * oleh Modal: sejajar kanan, berjarak, urutan Batal lalu Simpan mengikuti
+   * urutan penulisan. Beri `mr-auto` pada elemen yang ingin didorong ke kiri
+   * (mis. keterangan "n dari m dipilih").
+   */
   footer?: ReactNode;
   /** Bila diisi, panel dirender sebagai <form> agar tombol submit bekerja. */
   onSubmit?: (e: FormEvent) => void;
   /** Lebar maksimum panel, mis. "max-w-2xl". */
   width?: string;
+  /** Kelas tambahan untuk isi — jarak dalamnya sudah diberi Modal. */
   bodyClassName?: string;
   testId?: string;
 }) {
@@ -60,10 +74,12 @@ export function Modal({
         </button>
       </div>
 
-      <div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
+      <div className={`min-h-0 flex-1 overflow-y-auto px-4 py-4 ${bodyClassName}`}>
+        {children}
+      </div>
 
       {footer && (
-        <div className="shrink-0 border-t border-km-border bg-km-panel-soft px-4 py-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-3">
           {footer}
         </div>
       )}

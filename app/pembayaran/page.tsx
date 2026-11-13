@@ -10,6 +10,7 @@ import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
 import { PenerimaInput } from "@/components/PenerimaInput";
 import { Toast } from "@/components/Toast";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
+import { NoTransaksi } from "@/components/NoTransaksi";
 import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasBank";
 import {
@@ -310,7 +311,7 @@ export default function PembayaranPage() {
               label="Transfer dari Rekening *"
               hint={
                 formViharaId == null
-                  ? "Pilih vihara dulu — rekening mengikuti viharanya."
+                  ? "Pilih vihara dulu — pilihan rekening mengikuti yayasannya."
                   : undefined
               }
             >
@@ -322,10 +323,13 @@ export default function PembayaranPage() {
                 onChange={(e) => setSourceAccount(e.target.value)}
               >
                 <option value="">— Pilih rekening —</option>
+                {/* Pemilik rekening adalah YAYASAN (FV-36), jadi itulah yang
+                    disebut di label — bukan "atas nama", yang pada data lama
+                    masih berisi nama vihara dan menyesatkan. */}
                 {bankAccounts.map((b) => (
                   <option key={b.id} value={b.id}>
                     {bankBrand(b.bank_name)} — {b.account_number}
-                    {b.account_name ? ` (${b.account_name})` : ""}
+                    {b.entity_name ? ` (${b.entity_name})` : ""}
                   </option>
                 ))}
               </Select>
@@ -468,6 +472,10 @@ export default function PembayaranPage() {
           <table className="w-full text-[12px]">
             <thead className="bg-km-bg">
               <tr>
+                {/* No. Transaksi jadi kolom pertama (FV-40): nomor itulah
+                    yang dipakai saat merujuk transaksi ke approver atau
+                    mencocokkannya dengan jurnal. */}
+                <Th>No. Transaksi</Th>
                 <Th>Tanggal</Th>
                 {/* Vihara & Rekening: saat header "Semua Vihara", tanpa dua
                     kolom ini admin tidak bisa membedakan baris milik vihara
@@ -486,19 +494,26 @@ export default function PembayaranPage() {
             <tbody>
               {todayLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={10} className="px-3 py-8 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : todayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={10} className="px-3 py-8 text-center text-km-ink-muted">
                     Belum ada pengeluaran hari ini
                   </td>
                 </tr>
               ) : (
                 todayRows.map((r) => (
                   <tr key={r.id} className="border-t border-km-border hover:bg-km-panel-soft">
+                    <Td>
+                      <NoTransaksi
+                        code={r.code}
+                        onClick={() => setDetailId(r.id)}
+                        testId={`no-transaksi-${r.id}`}
+                      />
+                    </Td>
                     <Td>{r.date.slice(0, 10)}</Td>
                     <Td className="whitespace-nowrap">{r.vihara_name ?? "—"}</Td>
                     <Td>{r.name}</Td>
@@ -538,7 +553,11 @@ export default function PembayaranPage() {
         </div>
       </Card>
       {detailId != null && (
-        <PembayaranDetail id={detailId} onClose={() => setDetailId(null)} />
+        <PembayaranDetail
+          id={detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={reloadToday}
+        />
       )}
     </AppShell>
   );

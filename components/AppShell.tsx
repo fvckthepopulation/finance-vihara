@@ -40,7 +40,18 @@ type NavItem = {
   /** Sembunyikan pada instance mode yayasan tunggal. */
   hideInSingleEntity?: boolean;
 };
-type NavSection = { title: string; items: NavItem[] };
+/**
+ * Grup menu di dalam satu bagian (FV-37) — mis. "Penerimaan" yang memuat
+ * Daftar dan Input Penerimaan. Bisa dibuka-tutup; otomatis terbuka kalau
+ * salah satu isinya sedang aktif.
+ */
+type NavGroup = { title: string; icon: ReactNode; items: NavItem[] };
+
+type NavEntry = NavItem | NavGroup;
+
+const isGroup = (e: NavEntry): e is NavGroup => "items" in e;
+
+type NavSection = { title: string; items: NavEntry[] };
 
 const SECTIONS: NavSection[] = [
   {
@@ -73,38 +84,73 @@ const SECTIONS: NavSection[] = [
   {
     title: "Transaksi",
     items: [
+      // Yang satu topik dikelompokkan (FV-37): dengan bertambahnya menu
+      // daftar, daftar datar membuat menu berpasangan terpisah jauh.
       {
-        href: "/penerimaan",
-        label: "Input Penerimaan",
-        permission: "penerimaan.view",
+        title: "Penerimaan",
         icon: (
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M2 8h12M8 3l5 5-5 5" />
             <path d="M2 12h6" />
           </svg>
         ),
+        items: [
+          {
+            href: "/penerimaan/daftar",
+            label: "Daftar Penerimaan",
+            permission: "penerimaan.view",
+            icon: (
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 3h10v10H3z" />
+                <path d="M5.5 6.5h5M5.5 9.5h3" />
+              </svg>
+            ),
+          },
+          {
+            href: "/penerimaan",
+            label: "Input Penerimaan",
+            permission: "penerimaan.view",
+            icon: (
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 8h12M8 3l5 5-5 5" />
+                <path d="M2 12h6" />
+              </svg>
+            ),
+          },
+        ],
       },
       {
-        href: "/pengeluaran",
-        label: "Daftar Pengeluaran",
-        permission: "pembayaran.view",
-        icon: (
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M3 3h10v10H3z" />
-            <path d="M5.5 6.5h5M5.5 9.5h3" />
-          </svg>
-        ),
-      },
-      {
-        href: "/pembayaran",
-        label: "Input Pengeluaran",
-        permission: "pembayaran.view",
+        title: "Pengeluaran",
         icon: (
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M14 8H2M8 3L3 8l5 5" />
             <path d="M14 12H8" />
           </svg>
         ),
+        items: [
+          {
+            href: "/pengeluaran",
+            label: "Daftar Pengeluaran",
+            permission: "pembayaran.view",
+            icon: (
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 3h10v10H3z" />
+                <path d="M5.5 6.5h5M5.5 9.5h3" />
+              </svg>
+            ),
+          },
+          {
+            href: "/pembayaran",
+            label: "Input Pengeluaran",
+            permission: "pembayaran.view",
+            icon: (
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 8H2M8 3L3 8l5 5" />
+                <path d="M14 12H8" />
+              </svg>
+            ),
+          },
+        ],
       },
       {
         href: "/persetujuan",
@@ -255,6 +301,17 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
+        href: "/admin/penerimaan",
+        label: "Master Penerimaan",
+        permission: "masters.view",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M3 2h7l3 3v9H3z" />
+            <path d="M8 6.5v5M6 8.5h3.2a1.3 1.3 0 0 1 0 2.6H6" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/penerima",
         label: "Master Penerima",
         permission: "masters.view",
@@ -338,6 +395,12 @@ export function AppShell({ children, title, subtitle, actions }: Props) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  /**
+   * Grup yang ditutup pengguna (FV-37 poin 4). Bawaannya TERBUKA: menyimpan
+   * yang tertutup, bukan yang terbuka, membuat grup baru ikut terbuka tanpa
+   * perlu diurus — dan grup yang isinya sedang aktif tetap dipaksa terbuka.
+   */
+  const [tertutup, setTertutup] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     me()
@@ -367,58 +430,90 @@ export function AppShell({ children, title, subtitle, actions }: Props) {
 
   if (authError) return null;
 
+  // Satu item saja yang disorot: yang href-nya paling panjang di antara yang
+  // cocok. Tanpa ini "/penerimaan" ikut aktif saat membuka
+  // "/penerimaan/daftar", jadi dua menu tersorot sekaligus.
+  const bolehLihat = (item: NavItem) =>
+    (!item.permission ||
+      (Array.isArray(item.permission)
+        ? item.permission.some((p) => user?.permissions.includes(p) ?? false)
+        : (user?.permissions.includes(item.permission) ?? false))) &&
+    // Konsolidasi dkk. hanya untuk pemegang akses tingkat yayasan. Catatan:
+    // user dengan BEBERAPA vihara tetap bukan level yayasan — dulu cek
+    // `vihara_id == null` keliru meloloskan mereka.
+    (!item.yayasanOnly || (user?.can_see_yayasan_level ?? false)) &&
+    // Instance yayasan tunggal: sembunyikan menu lintas-vihara.
+    (!item.hideInSingleEntity || !(user?.app?.single_entity_mode ?? false));
+
+  const semuaHref = SECTIONS.flatMap((sec) =>
+    sec.items.flatMap((e) => (isGroup(e) ? e.items.map((i) => i.href) : [e.href])),
+  );
+  const hrefAktif =
+    semuaHref
+      .filter((h) => pathname === h || pathname.startsWith(h + "/"))
+      .sort((a, b) => b.length - a.length)[0] ?? null;
+
+  const tautan = (item: NavItem, dalamGrup: boolean) => {
+    const active = item.href === hrefAktif;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex items-center gap-2 py-2 transition ${
+          item.sub || dalamGrup ? "pl-9 pr-4 text-[12px]" : "px-4 text-[13px]"
+        } ${
+          active
+            ? "bg-km-accent-soft font-medium text-km-accent-ink"
+            : "text-km-ink-soft hover:bg-km-bg hover:text-km-ink"
+        }`}
+      >
+        <span
+          className={`h-3.5 w-3.5 flex-shrink-0 ${active ? "opacity-100" : "opacity-65"}`}
+        >
+          {item.icon}
+        </span>
+        {item.label}
+      </Link>
+    );
+  };
+
   const sidebarSections = (
     <>
       {SECTIONS.map((section) => {
-            const visibleItems = section.items.filter(
-              (item) =>
-                (!item.permission ||
-                  (Array.isArray(item.permission)
-                    ? item.permission.some((p) => user?.permissions.includes(p) ?? false)
-                    : (user?.permissions.includes(item.permission) ?? false))) &&
-                // Konsolidasi dkk. hanya untuk pemegang akses tingkat
-                // yayasan. Catatan: user dengan BEBERAPA vihara tetap bukan
-                // level yayasan — dulu cek `vihara_id == null` keliru
-                // meloloskan mereka.
-                (!item.yayasanOnly || (user?.can_see_yayasan_level ?? false)) &&
-                // Instance yayasan tunggal: sembunyikan menu lintas-vihara.
-                (!item.hideInSingleEntity || !(user?.app?.single_entity_mode ?? false)),
-            );
-            if (visibleItems.length === 0) return null;
-            return (
-              <div key={section.title} className="mt-3">
-                <p className="px-4 py-1 text-[10px] uppercase tracking-wider text-km-ink-muted">
-                  {section.title}
-                </p>
-                {visibleItems.map((item) => {
-                  const active =
-                    pathname === item.href || pathname.startsWith(item.href + "/");
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`flex items-center gap-2 py-2 transition ${
-                        item.sub ? "pl-9 pr-4 text-[12px]" : "px-4 text-[13px]"
-                      } ${
-                        active
-                          ? "bg-km-accent-soft font-medium text-km-accent-ink"
-                          : "text-km-ink-soft hover:bg-km-bg hover:text-km-ink"
-                      }`}
-                    >
-                      <span
-                        className={`h-3.5 w-3.5 flex-shrink-0 ${
-                          active ? "opacity-100" : "opacity-65"
-                        }`}
-                      >
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            );
-          })}
+        // Grup yang seluruh isinya tidak boleh diakses ikut hilang, bukan
+        // tampil kosong.
+        const terlihat = section.items
+          .map((e) =>
+            isGroup(e)
+              ? ({ ...e, items: e.items.filter(bolehLihat) } as NavGroup)
+              : e,
+          )
+          .filter((e) => (isGroup(e) ? e.items.length > 0 : bolehLihat(e)));
+        if (terlihat.length === 0) return null;
+        return (
+          <div key={section.title} className="mt-3">
+            <p className="px-4 py-1 text-[10px] uppercase tracking-wider text-km-ink-muted">
+              {section.title}
+            </p>
+            {terlihat.map((e) =>
+              isGroup(e) ? (
+                <GrupMenu
+                  key={e.title}
+                  grup={e}
+                  hrefAktif={hrefAktif}
+                  terbukaPaksa={tertutup[e.title] !== true}
+                  onToggle={() =>
+                    setTertutup((t) => ({ ...t, [e.title]: t[e.title] !== true }))
+                  }
+                  tautan={tautan}
+                />
+              ) : (
+                tautan(e, false)
+              ),
+            )}
+          </div>
+        );
+      })}
     </>
   );
 
@@ -529,6 +624,61 @@ export function AppShell({ children, title, subtitle, actions }: Props) {
           <main className="flex-1 bg-km-bg p-3 sm:p-5">{children}</main>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Satu grup menu yang bisa dibuka-tutup (FV-37).
+ *
+ * Grup yang isinya sedang aktif dipaksa terbuka — menutupnya akan
+ * menyembunyikan halaman yang sedang dibuka, dan menu aktif harus tetap
+ * terlihat tersorot.
+ */
+function GrupMenu({
+  grup,
+  hrefAktif,
+  terbukaPaksa,
+  onToggle,
+  tautan,
+}: {
+  grup: NavGroup;
+  hrefAktif: string | null;
+  terbukaPaksa: boolean;
+  onToggle: () => void;
+  tautan: (item: NavItem, dalamGrup: boolean) => ReactNode;
+}) {
+  const adaAktif = grup.items.some((i) => i.href === hrefAktif);
+  const terbuka = adaAktif || terbukaPaksa;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={terbuka}
+        data-testid={`grup-${grup.title.toLowerCase()}`}
+        className={`flex w-full items-center gap-2 px-4 py-2 text-[13px] transition ${
+          adaAktif
+            ? "font-medium text-km-accent-ink"
+            : "text-km-ink-soft hover:bg-km-bg hover:text-km-ink"
+        }`}
+      >
+        <span className={`h-3.5 w-3.5 flex-shrink-0 ${adaAktif ? "opacity-100" : "opacity-65"}`}>
+          {grup.icon}
+        </span>
+        <span className="flex-1 text-left">{grup.title}</span>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          className={`h-3 w-3 flex-shrink-0 transition-transform ${terbuka ? "rotate-90" : ""}`}
+        >
+          <path d="M6 3l5 5-5 5" />
+        </svg>
+      </button>
+      {terbuka && <div>{grup.items.map((i) => tautan(i, true))}</div>}
     </div>
   );
 }

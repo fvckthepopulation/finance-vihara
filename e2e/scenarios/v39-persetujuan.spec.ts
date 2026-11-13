@@ -146,7 +146,12 @@ test.describe("v39 persetujuan", () => {
     expect(baru?.status).toBe("posted");
   });
 
-  test("penyetuju boleh menolak draft walau tidak punya izin mencatat", async () => {
+  // Sejak FV-44 aturannya berubah: draft adalah pekerjaan setengah jadi
+  // milik PEMBUATNYA, jadi penyetuju tidak lagi boleh membuangnya. Jalan yang
+  // benar untuk penyetuju adalah menolak pengajuan (POST /reject), yang
+  // mengembalikan barisnya ke pembuatnya beserta alasannya — bukan menghapus
+  // diam-diam tanpa jejak.
+  test("penyetuju TIDAK boleh menghapus draft orang lain; yang diajukan ditolak dengan alasan", async () => {
     const tokenPencatat = await apiToken({ email: EMAIL_PENCATAT, password: PASSWORD });
     const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
       tokenPencatat,
@@ -168,10 +173,50 @@ test.describe("v39 persetujuan", () => {
     expect(draft.status).toBe(201);
 
     const tokenPenyetuju = await apiToken({ email: EMAIL_PENYETUJU, password: PASSWORD });
-    const ditolak = await apiCall(tokenPenyetuju, `/api/pembayaran/${draft.body.id}`, {
-      method: "DELETE",
-    });
+    const hapus = await apiCall<{ message?: string }>(
+      tokenPenyetuju,
+      `/api/pembayaran/${draft.body.id}`,
+      { method: "DELETE" },
+    );
+    expect(hapus.status, "draft orang lain bukan milik penyetuju").toBe(403);
+    // Penyetuju di suite ini tidak punya izin mencatat, jadi yang menolak
+    // lebih dulu adalah penjagaan izin; pemegang izin mencatat yang bukan
+    // pembuatnya akan menerima pesan "pembuat draft" (lihat v49).
+    expect(hapus.body.message ?? "").toMatch(/tidak berhak|pembuat draft/i);
+
+    // Yang diajukan pencatatnya memang boleh ditolak, dengan alasan tercatat.
+    expect(
+      (await apiCall(tokenPencatat, `/api/pembayaran/${draft.body.id}/submit`, { method: "POST" }))
+        .status,
+    ).toBe(200);
+    const ditolak = await apiCall<{ status: string; reject_reason: string }>(
+      tokenPenyetuju,
+      `/api/pembayaran/${draft.body.id}/reject`,
+      { method: "POST", body: JSON.stringify({ reason: "Bukti belum dilampirkan" }) },
+    );
     expect(ditolak.status).toBe(200);
+    expect(ditolak.body.status).toBe("rejected");
+    expect(ditolak.body.reject_reason).toBe("Bukti belum dilampirkan");
+
+    // Yang ditolak dikembalikan untuk DIPERBAIKI, bukan dibuang: pembuatnya
+    // boleh mengubahnya lalu mengajukan ulang, dan jejak penolakannya
+    // dibersihkan supaya approver tidak melihat alasan lama.
+    expect(
+      (
+        await apiCall(tokenPencatat, `/api/pembayaran/${draft.body.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ reference: "BKT-REVISI" }),
+        })
+      ).status,
+    ).toBe(200);
+    const diajukanUlang = await apiCall<{ status: string; reject_reason: string | null }>(
+      tokenPencatat,
+      `/api/pembayaran/${draft.body.id}/submit`,
+      { method: "POST" },
+    );
+    expect(diajukanUlang.status).toBe(200);
+    expect(diajukanUlang.body.status).toBe("submitted");
+    expect(diajukanUlang.body.reject_reason).toBeNull();
   });
 
   test("draft vihara lain tetap tidak bisa dihapus", async () => {

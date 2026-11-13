@@ -156,11 +156,13 @@ test.describe("ENV-C · Input Penerimaan", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("500000");
     await selectByLabelRegex(page.getByLabel("Kategori Dana *"), /Dana Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Penerimaan *"), /Dana/);
-    await page.getByLabel("Diterima oleh").fill("Lili");
+    // "Diterima oleh" kini terisi otomatis dari akun yang login dan tidak
+    // bisa diketik (FV-45) — yang diperiksa justru itu.
+    await expect(page.getByTestId("form-diterima")).toBeDisabled();
     await page.getByLabel("Catatan").fill(catatan);
-    await page.getByRole("button", { name: /Simpan Penerimaan/i }).click();
+    await page.getByTestId("tombol-submit").click();
 
-    await expect(page.getByText(/berhasil|tersimpan|disetujui/i).first()).toBeVisible({
+    await expect(page.getByText("Penerimaan disimpan dan disetujui")).toBeVisible({
       timeout: 15_000,
     });
     // Form ter-reset: jumlahnya kembali kosong/0.

@@ -89,8 +89,10 @@
   --color-km-purple-soft: var(--km-purple-soft);
 
   /* Monospace (font-mono) — DM Mono via next/font.
-     HANYA untuk pengenal: kode akun COA, kode dokumen (PAY-…), key permission.
-     Nominal uang dan nomor rekening memakai font utama + tabular-nums (FV-23). */
+     Sejak FV-43 HANYA untuk pengenal yang bukan angka (key permission seperti
+     pembayaran.view). Nomor transaksi, nomor jurnal, kode akun COA, nomor
+     rekening, dan nominal uang memakai font utama + tabular-nums — lihat
+     kelas .kode di bawah. */
   --font-mono: var(--font-dm-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
@@ -117,4 +119,20 @@ input:focus, select:focus, textarea:focus {
     overflow-x: auto;
     white-space: nowrap;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   .kode — nomor transaksi, nomor jurnal, kode akun COA, nomor rekening.
+
+   Sebelumnya dipakai font-mono (DM Mono), yang menggambar angka 0 dengan
+   garis miring sehingga mudah tertukar saat mencocokkan nomor PAY dengan
+   bukti atau kode akun dengan COA (FV-43). Sekarang font utama, dengan
+   tabular-nums supaya kode tetap sejajar antar baris tabel.
+
+   Satu kelas, satu tempat ubah: kalau nanti perlu jarak huruf atau warna
+   tersendiri, cukup di sini.
+   -------------------------------------------------------------------------- */
+.kode {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }

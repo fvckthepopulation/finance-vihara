@@ -1,4 +1,5 @@
 import { api, API_URL, getToken, Paginated } from "./api";
+import { StatusTransaksi } from "./statusTransaksi";
 
 export type PembayaranMethod = "transfer" | "tunai" | "auto_debit";
 
@@ -38,32 +39,23 @@ function humanize(key: string): string {
   return key.split("_").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
 }
 
-export type PembayaranStatus =
-  | "draft"
-  | "submitted"
-  | "posted"
-  | "rejected"
-  | "cancelled";
+/**
+ * Kategori Biaya yang ditawarkan form Input Pengeluaran.
+ *
+ * Empat kategori dana ini yang dipakai mockup, dan form ubah draft harus
+ * menawarkan daftar yang sama — kalau tidak, membuka draft lalu menyimpannya
+ * bisa mengubah kategorinya ke pilihan yang tidak pernah ada di form input.
+ */
+export const KATEGORI_BIAYA_FORM = [
+  "biaya_bhikkhu",
+  "biaya_operasional",
+  "biaya_paramita",
+  "biaya_perayaan",
+] as const;
 
-/** Label siklus draft -> pengajuan -> persetujuan, sesuai nama di laporan QC. */
-export const STATUS_LABEL: Record<PembayaranStatus, string> = {
-  draft: "Draft",
-  submitted: "Menunggu Persetujuan",
-  posted: "Disetujui",
-  rejected: "Ditolak",
-  cancelled: "Dibatalkan",
-};
-
-export const STATUS_TONE: Record<
-  PembayaranStatus,
-  "neutral" | "info" | "warn" | "success" | "danger"
-> = {
-  draft: "neutral",
-  submitted: "warn",
-  posted: "success",
-  rejected: "danger",
-  cancelled: "danger",
-};
+// Status dipakai bersama dengan penerimaan — lihat lib/statusTransaksi.ts.
+export type PembayaranStatus = StatusTransaksi;
+export { STATUS_LABEL, STATUS_TONE } from "./statusTransaksi";
 
 export type Pembayaran = {
   id: number;

@@ -91,9 +91,21 @@ test.describe("v46 master pengeluaran", () => {
     await expect(page.locator('[data-testid^="nama-row-"]').first()).toBeVisible({
       timeout: 15_000,
     });
-    const kategoriKolom = await page.locator('[data-testid^="nama-row-"] td:nth-child(2)').allTextContents();
-    expect(kategoriKolom.length).toBeGreaterThan(0);
-    for (const t of kategoriKolom) expect(t).toContain("Bhikkhu");
+    // Baris LAMA tetap terpasang selagi permintaan tersaring berjalan, dan
+    // satu kali baca bisa menangkap campurannya: locator-nya di-resolve
+    // sebelum render baru, isinya dibaca sesudahnya. Jadi yang dipoll adalah
+    // KESELURUHAN kolom — ada isinya, dan semuanya kategori yang dipilih.
+    await expect
+      .poll(
+        async () => {
+          const kolom = await page
+            .locator('[data-testid^="nama-row-"] td:nth-child(2)')
+            .allTextContents();
+          return kolom.length > 0 && kolom.every((t) => t.includes("Bhikkhu"));
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
 
     // Pencarian kategori (FV-27).
     await page.getByTestId("cari-kategori").fill("zzz-tidak-ada");

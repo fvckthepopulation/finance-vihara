@@ -7,12 +7,13 @@ import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag } from "@/components/DanaTag";
 import { Field, Input, Select } from "@/components/Field";
+import { NoTransaksi } from "@/components/NoTransaksi";
 import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { getMyScope, ScopeVihara } from "@/lib/api";
 import { PembayaranStatus, STATUS_LABEL, STATUS_TONE } from "@/lib/pembayaran";
 import { fmtTanggal } from "@/lib/tanggal";
-import { listTransactions, TransactionsResponse } from "@/lib/transactions";
+import { listDaftarTransaksi, TransactionsResponse } from "@/lib/transactions";
 
 // ============================================================================
 // Daftar pengeluaran lengkap.
@@ -72,7 +73,7 @@ export default function DaftarPengeluaranPage() {
   const muat = useCallback(() => {
     setLoading(true);
     setError(null);
-    listTransactions({
+    listDaftarTransaksi({
       tipe: "Pengeluaran",
       from: f.from || undefined,
       to: f.to || undefined,
@@ -168,6 +169,8 @@ export default function DaftarPengeluaranPage() {
           <table className="w-full text-[12px]">
             <thead className="bg-km-bg">
               <tr>
+                {/* FV-40 — nomor transaksi di kolom pertama, bisa diklik. */}
+                <Th>No. Transaksi</Th>
                 <Th>Tanggal</Th>
                 <Th>Vihara</Th>
                 <Th>Nama Pengeluaran</Th>
@@ -181,19 +184,26 @@ export default function DaftarPengeluaranPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-10 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-10 text-center text-km-ink-muted">
                     Tidak ada pengeluaran
                   </td>
                 </tr>
               ) : (
                 rows.map((r) => (
                   <tr key={r.id} className="border-t border-km-border hover:bg-km-panel-soft">
+                    <Td>
+                      <NoTransaksi
+                        code={r.code}
+                        onClick={() => setDetailId(r.id)}
+                        testId={`no-transaksi-${r.id}`}
+                      />
+                    </Td>
                     <Td className="whitespace-nowrap">{fmtTanggal(r.date)}</Td>
                     <Td className="whitespace-nowrap">{r.vihara_name ?? "—"}</Td>
                     <Td>
@@ -250,7 +260,7 @@ export default function DaftarPengeluaranPage() {
       </Card>
 
       {detailId != null && (
-        <PembayaranDetail id={detailId} onClose={() => setDetailId(null)} />
+        <PembayaranDetail id={detailId} onClose={() => setDetailId(null)} onChanged={muat} />
       )}
     </AppShell>
   );

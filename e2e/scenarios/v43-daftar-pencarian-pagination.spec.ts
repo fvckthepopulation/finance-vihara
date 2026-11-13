@@ -89,8 +89,9 @@ test.describe("v43 daftar, pencarian & pagination", () => {
     });
     const baris = page.locator("tbody tr");
 
-    // Kolom Vihara (kolom ke-2) tidak boleh menyebut vihara lain.
-    const viharaKolom = await baris.locator("td:nth-child(2)").allTextContents();
+    // Kolom Vihara (kolom ke-3 sejak No. Transaksi di depan, FV-40) tidak
+    // boleh menyebut vihara lain.
+    const viharaKolom = await baris.locator("td:nth-child(3)").allTextContents();
     expect(viharaKolom.length).toBeGreaterThan(0);
     for (const v of viharaKolom) {
       expect(v, "bendahara VVG tidak boleh melihat vihara lain").toMatch(/Vipassan|—/);
@@ -110,7 +111,8 @@ test.describe("v43 daftar, pencarian & pagination", () => {
     });
     const baris = page.locator("tbody tr").first();
 
-    const jumlah = baris.locator("td:nth-child(6)"); // kolom Jumlah
+    // Kolom Jumlah ke-7 sejak No. Transaksi di depan (FV-40).
+    const jumlah = baris.locator("td:nth-child(7)");
     await expect(jumlah).toContainText("Rp");
 
     const gaya = await jumlah.evaluate((el) => {
@@ -126,7 +128,7 @@ test.describe("v43 daftar, pencarian & pagination", () => {
 
     // Ukurannya minimal sama dengan kolom teks lain di tabel yang sama.
     const ukuranNama = await baris
-      .locator("td:nth-child(3)")
+      .locator("td:nth-child(4)")
       .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
     expect(gaya.size).toBeGreaterThanOrEqual(ukuranNama);
 

@@ -182,7 +182,7 @@ function ImportExcelModal({
                   <tbody>
                     {preview.rows.map((r) => (
                       <tr key={r.row_no} className={`border-t border-km-border ${r.valid ? "" : "bg-km-red-soft/40"}`}>
-                        <td className="px-2 py-1.5 font-mono">{r.row_no}</td>
+                        <td className="px-2 py-1.5 kode">{r.row_no}</td>
                         <td className="px-2 py-1.5">
                           <Badge tone={r.valid ? "success" : "danger"}>{r.valid ? "OK" : "Error"}</Badge>
                         </td>

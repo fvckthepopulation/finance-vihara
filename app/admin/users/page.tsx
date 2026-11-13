@@ -279,16 +279,16 @@ function UserForm({
       onClose={onClose}
       onSubmit={handleSubmit}
       footer={
-        <div className="flex items-center justify-end gap-2">
+        <>
           <Button type="button" variant="default" onClick={onClose}>Batal</Button>
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "Menyimpan…" : "Simpan"}
           </Button>
-        </div>
+        </>
       }
     >
 
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-3">
           <Field label="Nama">
             <Input required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>

@@ -325,7 +325,7 @@ export default function RiwayatPage() {
                           </>
                         )}
                       </div>
-                      <div className="mt-0.5 font-mono text-[10px] text-km-ink-muted">
+                      <div className="mt-0.5 kode text-[10px] text-km-ink-muted">
                         {r.code}
                       </div>
                     </Td>
