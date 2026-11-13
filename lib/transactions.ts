@@ -4,7 +4,12 @@ import { api, API_URL, getToken, Paginated } from "./api";
 
 export type TransactionTipe = "Penerimaan" | "Pengeluaran";
 export type TransactionSource = "km" | "manual";
-export type TransactionStatus = "draft" | "posted" | "cancelled";
+export type TransactionStatus =
+  | "draft"
+  | "submitted"
+  | "posted"
+  | "rejected"
+  | "cancelled";
 
 export type TransactionRow = {
   id: number;
@@ -32,6 +37,12 @@ export type TransactionRow = {
   /** Terisi bila transaksi sudah dibatalkan lewat jurnal pembalik. */
   voided_at?: string | null;
   void_reason?: string | null;
+  /** Jejak siklus draft → pengajuan → persetujuan. */
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+  submitted_by_user_id?: number | null;
+  rejected_at?: string | null;
+  reject_reason?: string | null;
   /**
    * Referensi eksternal — untuk `source: "km"` berisi ref donasi KalyanaMitta
    * (dipakai link drill-down "KM ↗"). Opsional: backend pra-Phase 7 belum
@@ -60,12 +71,15 @@ export type ListTransactionsParams = {
   sumber?: TransactionSource | "";
   status?: TransactionStatus | "";
   vihara_id?: number | null;
+  /** Saring menurut pengaju (id pengguna). */
+  submitted_by?: number | null;
   page?: number;
   per_page?: number;
 };
 
 function buildQuery(params: ListTransactionsParams): URLSearchParams {
   const sp = new URLSearchParams();
+  if (params.submitted_by != null) sp.set("submitted_by", String(params.submitted_by));
   if (params.search) sp.set("search", params.search);
   if (params.tipe) sp.set("tipe", params.tipe);
   if (params.category) sp.set("category", params.category);

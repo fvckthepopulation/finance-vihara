@@ -57,8 +57,8 @@ test.describe("v41 jurnal & detail", () => {
         "base64",
       ),
     });
-    await page.getByRole("button", { name: /Simpan Pengeluaran/ }).click();
-    await expect(page.getByText(/berhasil disimpan/)).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 15_000 });
 
     const terakhir = await apiCall<{ data: Array<{ id: number }> }>(
       token,
@@ -86,12 +86,14 @@ test.describe("v41 jurnal & detail", () => {
       "Transfer dari Rekening",
       "Dibayarkan kepada / PIC",
       "No. Bukti / Referensi",
-      "Disetujui oleh",
     ]) {
       await expect(modal.getByText(label, { exact: true })).toBeVisible();
     }
     await expect(modal).toContainText("Toko Fotocopy");
     await expect(modal).toContainText(bukti);
+
+    // Penyetuju kini bagian dari jejak siklus, bukan field isian (FV-24).
+    await expect(modal.getByTestId("detail-penyetuju")).toContainText("Disetujui oleh");
 
     // Lampiran gambar benar-benar termuat, bukan ikon rusak.
     const gambar = modal.getByTestId("lampiran-gambar");

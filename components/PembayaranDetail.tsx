@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import {
   categoryLabel,
+  STATUS_LABEL,
   fetchPembayaranAttachment,
   getPembayaran,
   Pembayaran,
@@ -78,7 +79,7 @@ export function PembayaranDetail({
         ["Vihara", data.vihara?.name ?? "—"],
         ["Tanggal", fmtTanggal(data.date)],
         ["Jumlah", fmtRp(data.amount)],
-        ["Kategori Biaya", categoryLabel(data.category)],
+        ["Kategori Biaya", data.category ? categoryLabel(data.category) : "—"],
         ["Nama Pengeluaran", data.name ?? "—"],
         ["Metode Pembayaran", data.method === "transfer" ? "Transfer Bank" : data.method],
         [
@@ -89,7 +90,6 @@ export function PembayaranDetail({
         ],
         ["Dibayarkan kepada / PIC", data.payee_name ?? "—"],
         ["No. Bukti / Referensi", data.reference ?? "—"],
-        ["Disetujui oleh", data.approved_by_name ?? "—"],
         ["Catatan", data.description ?? "—"],
       ]
     : [];
@@ -129,6 +129,45 @@ export function PembayaranDetail({
                 </div>
               ))}
             </dl>
+
+            {/* Jejak persetujuan — dicatat sistem, bukan diketik penginput.
+                Nilai lama di approved_by_name tetap ditampilkan tapi diberi
+                keterangan, supaya tidak tertukar dengan penyetuju yang sah. */}
+            <div className="mt-4 border-t border-km-border pt-3">
+              <p className="mb-2 text-[10.5px] uppercase tracking-wide text-km-ink-muted">
+                Status &amp; Persetujuan
+              </p>
+              <div className="space-y-1 text-[12.5px]">
+                <p data-testid="detail-status">
+                  <span className="text-km-ink-muted">Status: </span>
+                  {STATUS_LABEL[data.status] ?? data.status}
+                </p>
+                <p>
+                  <span className="text-km-ink-muted">Diajukan oleh: </span>
+                  {data.submitted_by?.name
+                    ? `${data.submitted_by.name} — ${fmtTanggal(data.submitted_at)}`
+                    : "—"}
+                </p>
+                <p data-testid="detail-penyetuju">
+                  <span className="text-km-ink-muted">Disetujui oleh: </span>
+                  {data.status === "posted" && data.posted_by?.name
+                    ? `${data.posted_by.name} — ${fmtTanggal(data.posted_at)}`
+                    : "—"}
+                </p>
+                {data.status === "rejected" && (
+                  <p className="text-km-red-ink">
+                    <span className="text-km-ink-muted">Ditolak oleh: </span>
+                    {data.rejected_by?.name ?? "—"} — {fmtTanggal(data.rejected_at)}
+                    {data.reject_reason ? ` · ${data.reject_reason}` : ""}
+                  </p>
+                )}
+                {data.approved_by_name && (
+                  <p className="text-[11.5px] text-km-ink-muted" data-testid="penyetuju-manual">
+                    Catatan penginput (diisi manual): {data.approved_by_name}
+                  </p>
+                )}
+              </div>
+            </div>
 
             <div className="mt-4 border-t border-km-border pt-3">
               <p className="mb-2 text-[10.5px] uppercase tracking-wide text-km-ink-muted">

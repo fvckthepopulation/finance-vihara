@@ -89,9 +89,11 @@ test.describe("v39 persetujuan", () => {
 
     await page.goto("/pembayaran");
 
-    // Tombolnya jujur menyebut apa yang akan terjadi.
-    const simpan = page.getByRole("button", { name: /Simpan sebagai Draft/ });
-    await expect(simpan).toBeVisible({ timeout: 10_000 });
+    // Pencatat punya Simpan sebagai Draft DAN Ajukan Persetujuan; yang
+    // mengantre hanya yang diajukan — draft tetap miliknya sendiri.
+    await expect(page.getByTestId("tombol-draft")).toBeVisible({ timeout: 10_000 });
+    const simpan = page.getByTestId("tombol-ajukan");
+    await expect(simpan).toBeVisible();
 
     await page.getByLabel("Jumlah (Rp) *").fill("55000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
@@ -100,7 +102,7 @@ test.describe("v39 persetujuan", () => {
     await page.getByLabel("No. Bukti / Referensi").fill(BUKTI);
     await simpan.click();
 
-    await expect(page.getByText(/Tersimpan sebagai draft/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/diajukan — menunggu persetujuan/)).toBeVisible({ timeout: 10_000 });
     // Inti laporannya: pesan ini tidak boleh muncul lagi.
     await expect(page.locator("body")).not.toContainText("This action is unauthorized");
 

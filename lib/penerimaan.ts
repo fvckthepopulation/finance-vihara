@@ -128,6 +128,19 @@ export async function createPenerimaan(input: CreatePenerimaanInput): Promise<Pe
   return api<Penerimaan>(`/api/penerimaan`, { method: "POST", body: JSON.stringify(input) });
 }
 
+/** Ajukan draft penerimaan ke antrean persetujuan. */
+export async function submitPenerimaan(id: number): Promise<Penerimaan> {
+  return api<Penerimaan>(`/api/penerimaan/${id}/submit`, { method: "POST" });
+}
+
+/** Tolak pengajuan penerimaan, alasan wajib. */
+export async function rejectPenerimaan(id: number, reason: string): Promise<Penerimaan> {
+  return api<Penerimaan>(`/api/penerimaan/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function postPenerimaan(id: number): Promise<Penerimaan> {
   return api<Penerimaan>(`/api/penerimaan/${id}/post`, { method: "POST" });
 }

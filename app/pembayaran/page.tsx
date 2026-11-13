@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/Button";
+import { Badge } from "@/components/Badge";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag, DANA_CATEGORY_LABEL, debetDanaCategory } from "@/components/DanaTag";
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
@@ -13,6 +14,10 @@ import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasB
 import {
   createPembayaran,
   postPembayaran,
+  PembayaranStatus,
+  STATUS_LABEL,
+  STATUS_TONE,
+  submitPembayaran,
   uploadPembayaranAttachment,
 } from "@/lib/pembayaran";
 import { listTransactionNames, TransactionName } from "@/lib/transactionNames";
@@ -40,6 +45,7 @@ export default function PembayaranPage() {
   // ----- form state -----
   const { can } = useAuth();
   const bisaSetujui = can("pembayaran.approve");
+  const bisaCatat = can("pembayaran.create");
   const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState(0);
@@ -48,13 +54,15 @@ export default function PembayaranPage() {
   const [sourceAccount, setSourceAccount] = useState("");
   const [payeeName, setPayeeName] = useState("");
   const [reference, setReference] = useState("");
-  const [approvedBy, setApprovedBy] = useState("");
   const [notes, setNotes] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
-  const [pending, setPending] = useState(false);
+  // null = tidak ada yang berjalan; selain itu aksi yang sedang jalan.
+  const [pending, setPending] = useState<Aksi | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Filter status tabel di bawah form (FV-21 poin 4).
+  const [filterStatus, setFilterStatus] = useState<"" | PembayaranStatus>("");
   // Input file tidak terkendali React; perlu ref untuk mengosongkannya.
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -121,12 +129,13 @@ export default function PembayaranPage() {
       from: d,
       to: d,
       vihara_id: headerViharaId,
+      status: filterStatus || undefined,
       per_page: 100,
     })
       .then((res) => setTodayRows(res.data))
       .catch(() => setTodayRows([]))
       .finally(() => setTodayLoading(false));
-  }, [headerViharaId, viharaReady]);
+  }, [headerViharaId, viharaReady, filterStatus]);
 
   useEffect(() => {
     reloadToday();
@@ -145,15 +154,23 @@ export default function PembayaranPage() {
     setSourceAccount("");
     setPayeeName("");
     setReference("");
-    setApprovedBy("");
     setNotes("");
     setAttachment(null);
     if (fileRef.current) fileRef.current.value = "";
     setError(null);
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  type Aksi = "draft" | "ajukan" | "submit";
+
+  /**
+   * Tiga aksi, satu jalur simpan.
+   *
+   * Dulu tombolnya cuma satu dan artinya berubah diam-diam menurut izin
+   * pengguna: "Simpan sebagai Draft" sebenarnya langsung mengajukan. Sekarang
+   * niatnya dinyatakan di tombol, dan server memeriksa izinnya sendiri —
+   * tombol yang hilang bukan satu-satunya penjaga.
+   */
+  async function simpan(aksi: Aksi) {
     if (scope.entityId == null) {
       setError("Yayasan wajib dipilih.");
       return;
@@ -162,56 +179,50 @@ export default function PembayaranPage() {
       setError("Vihara wajib dipilih.");
       return;
     }
-    if (!sourceAccount) {
+    // Draft boleh setengah jadi; yang naik ke persetujuan harus lengkap.
+    if (aksi !== "draft" && !sourceAccount) {
       setError("Transfer dari Rekening wajib dipilih.");
       return;
     }
     setError(null);
-    setPending(true);
+    setPending(aksi);
     try {
       const created = await createPembayaran({
         date,
-        amount,
-        category,
-        name,
+        amount: amount || undefined,
+        category: category || undefined,
+        name: name || undefined,
         method: "transfer",
         bank_account_id: sourceAccount ? Number(sourceAccount) : undefined,
         payee_name: payeeName || null,
         reference: reference || null,
-        approved_by_name: approvedBy || null,
         description: notes || null,
-        // Selalu eksplisit: vihara transaksi adalah isi form, apa pun yang
-        // sedang dipilih di header. Yayasan diturunkan server dari vihara ini.
         vihara_id: scope.viharaId,
+        draft: aksi === "draft",
       });
-      // Lampiran diunggah selagi transaksi masih draft. Kalau unggahannya
-      // gagal, transaksi belum terposting dan bisa diulang — lebih baik
-      // daripada pengeluaran terposting tanpa bukti yang dikira sudah ada.
+
+      // Lampiran diunggah selagi masih draft: kalau gagal, transaksi belum
+      // naik ke mana pun dan bisa diulang.
       if (attachment) {
         await uploadPembayaranAttachment(created.id, attachment);
       }
-      // Posting hanya bila pengguna memang berhak menyetujui. Tanpa izin
-      // itu transaksi berhenti sebagai draft dan menunggu persetujuan —
-      // dulu UI tetap memanggil post, lalu gagal 403 dan meninggalkan draft
-      // gantung yang tidak terlihat di layar mana pun.
-      if (bisaSetujui) {
+
+      if (aksi === "ajukan") {
+        await submitPembayaran(created.id);
+        setToast("Pengeluaran diajukan — menunggu persetujuan");
+      } else if (aksi === "submit") {
         await postPembayaran(created.id);
-        setToast(
-          attachment
-            ? "Pengeluaran berhasil disimpan beserta lampirannya"
-            : "Pengeluaran berhasil disimpan",
-        );
+        setToast("Pengeluaran disimpan dan disetujui");
       } else {
-        setToast("Tersimpan sebagai draft — menunggu persetujuan");
+        setToast("Tersimpan sebagai draft — belum diajukan");
       }
-      // Yayasan/vihara dipertahankan supaya entri berikutnya untuk vihara
-      // yang sama tidak perlu dipilih ulang.
+
       resetForm({ keepScope: true });
       reloadToday();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan pengeluaran");
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
 
@@ -221,14 +232,14 @@ export default function PembayaranPage() {
         <Toast message={toast} tone="success" onClose={() => setToast(null)} />
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => e.preventDefault()}>
         <Card>
           <CardHeader
             title="Input Pengeluaran"
             subtitle="Pilih yayasan dan vihara terlebih dahulu"
           />
           <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-2">
-            <YayasanViharaFields value={scope} onChange={setScope} disabled={pending} />
+            <YayasanViharaFields value={scope} onChange={setScope} disabled={pending !== null} />
             <Field label="Tanggal *">
               <Input
                 type="date"
@@ -337,13 +348,6 @@ export default function PembayaranPage() {
                 className="w-full rounded-lg border border-km-border-strong bg-km-panel px-2.5 py-1.5 text-[12px] text-km-ink file:mr-2 file:rounded-md file:border-0 file:bg-km-panel-soft file:px-2 file:py-1 file:text-[11px] file:text-km-ink-soft"
               />
             </Field>
-            <Field label="Disetujui oleh">
-              <Input
-                value={approvedBy}
-                placeholder="Nama approver"
-                onChange={(e) => setApprovedBy(e.target.value)}
-              />
-            </Field>
             <div className="sm:col-span-2">
               <Field label="Catatan">
                 <Textarea
@@ -364,38 +368,77 @@ export default function PembayaranPage() {
               <span className="mr-auto text-[11px] font-medium text-km-amber-ink">
                 {needVihara
                   ? "Pilih yayasan dan vihara dulu"
-                  : "Pilih rekening sumber dulu"}
+                  : /* Draft boleh tanpa rekening; yang naik ke persetujuan tidak. */
+                    "Pilih rekening sumber dulu"}
               </span>
             )}
-            <Button type="button" variant="ghost" onClick={() => resetForm()}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => resetForm()}
+              data-testid="tombol-reset"
+            >
               Reset
             </Button>
-            <Button
-              type="submit"
-              variant="danger"
-              disabled={pending || needVihara || needRekening}
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="h-3 w-3"
+            {bisaCatat && (
+              <Button
+                type="button"
+                variant="default"
+                disabled={pending !== null || needVihara}
+                onClick={() => simpan("draft")}
+                data-testid="tombol-draft"
               >
-                <path d="M3 8l4 4 6-7" />
-              </svg>
-              {pending
-                ? "Menyimpan…"
-                : bisaSetujui
-                  ? "Simpan Pengeluaran"
-                  : "Simpan sebagai Draft"}
-            </Button>
+                {pending === "draft" ? "Menyimpan…" : "Simpan sebagai Draft"}
+              </Button>
+            )}
+            {bisaCatat && (
+              <Button
+                type="button"
+                variant="primary"
+                disabled={pending !== null || needVihara || needRekening}
+                onClick={() => simpan("ajukan")}
+                data-testid="tombol-ajukan"
+              >
+                {pending === "ajukan" ? "Mengajukan…" : "Ajukan Persetujuan"}
+              </Button>
+            )}
+            {bisaCatat && bisaSetujui && (
+              <Button
+                type="button"
+                variant="danger"
+                disabled={pending !== null || needVihara || needRekening}
+                onClick={() => simpan("submit")}
+                data-testid="tombol-submit"
+              >
+                {pending === "submit" ? "Menyimpan…" : "Submit Pengeluaran"}
+              </Button>
+            )}
           </div>
         </Card>
       </form>
 
       <Card className="mt-3.5">
-        <CardHeader title="Pengeluaran Hari Ini" />
+        <CardHeader
+          title="Pengeluaran Hari Ini"
+          right={
+            <label className="flex items-center gap-2 text-[11px] text-km-ink-muted">
+              Status
+              <Select
+                data-testid="filter-status-tabel"
+                className="w-48"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as "" | PembayaranStatus)}
+              >
+                <option value="">Semua status</option>
+                {(Object.keys(STATUS_LABEL) as PembayaranStatus[]).map((k) => (
+                  <option key={k} value={k}>
+                    {STATUS_LABEL[k]}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          }
+        />
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
             <thead className="bg-km-bg">
@@ -411,19 +454,20 @@ export default function PembayaranPage() {
                 <Th>Debet Dana</Th>
                 <Th>Rekening</Th>
                 <Th className="text-right">Jumlah</Th>
+                <Th>Status</Th>
                 <Th>Aksi</Th>
               </tr>
             </thead>
             <tbody>
               {todayLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : todayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">
                     Belum ada pengeluaran hari ini
                   </td>
                 </tr>
@@ -444,6 +488,11 @@ export default function PembayaranPage() {
                     </Td>
                     <Td className="text-right font-mono tabular-nums font-medium text-km-red">
                       {fmtRp(r.amount)}
+                    </Td>
+                    <Td>
+                      <Badge tone={STATUS_TONE[r.status as PembayaranStatus] ?? "neutral"}>
+                        {STATUS_LABEL[r.status as PembayaranStatus] ?? r.status}
+                      </Badge>
                     </Td>
                     <Td>
                       <Button

@@ -39,7 +39,13 @@ export function danaCategoryLabel(category: string): string {
 }
 
 /** Kategori biaya → kategori dana yang didebet (biaya_bhikkhu → dana_bhikkhu). */
-export function debetDanaCategory(biayaCategory: string): string {
+/**
+ * Sejak draft boleh belum punya kategori (siklus draft → persetujuan),
+ * nilainya bisa null. Satu draft setengah jadi tidak boleh membuat seluruh
+ * tabel gagal dirender.
+ */
+export function debetDanaCategory(biayaCategory: string | null | undefined): string {
+  if (!biayaCategory) return "";
   return biayaCategory.startsWith("biaya_")
     ? biayaCategory.replace(/^biaya_/, "dana_")
     : biayaCategory;
@@ -49,10 +55,15 @@ export function DanaTag({
   category,
   label,
 }: {
-  category: string;
+  category: string | null | undefined;
   /** Teks tag; default dari kamus label kategori. */
   label?: string;
 }) {
+  // Kategori kosong (draft belum lengkap) ditampilkan sebagai strip, bukan
+  // tag kosong tanpa makna.
+  if (!category) {
+    return <span className="text-[11px] text-km-ink-muted">—</span>;
+  }
   const style = TAG_STYLE[category];
   const text = label ?? danaCategoryLabel(category);
   if (!style) {

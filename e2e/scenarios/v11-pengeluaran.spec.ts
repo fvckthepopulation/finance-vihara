@@ -47,9 +47,9 @@ test.describe("v11 pengeluaran", () => {
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
     await selectByLabelRegex(page.getByLabel("Transfer dari Rekening"), /BCA/);
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
-    await page.getByRole("button", { name: "Simpan Pengeluaran" }).click();
+    await page.getByTestId("tombol-submit").click();
 
-    await expect(page.getByText("Pengeluaran berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 10_000 });
 
     const row = page
       .locator("tr", { hasText: "Biaya ATK" })
@@ -83,12 +83,15 @@ test.describe("v11 pengeluaran", () => {
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
     await expect(rekening).toHaveValue("");
-    await expect(page.getByRole("button", { name: "Simpan Pengeluaran" })).toBeDisabled();
+    // Draft boleh tanpa rekening; yang naik ke persetujuan tertahan.
+    await expect(page.getByTestId("tombol-submit")).toBeDisabled();
+    await expect(page.getByTestId("tombol-ajukan")).toBeDisabled();
+    await expect(page.getByTestId("tombol-draft")).toBeEnabled();
     await expect(page.getByText("Pilih rekening sumber dulu")).toBeVisible();
 
     // Begitu rekening dipilih, penahannya lepas.
     await selectByLabelRegex(rekening, /BCA/);
-    await expect(page.getByRole("button", { name: "Simpan Pengeluaran" })).toBeEnabled();
+    await expect(page.getByTestId("tombol-submit")).toBeEnabled();
   });
 
   test("API menolak pengeluaran transfer tanpa rekening, dengan pesan terbaca", async () => {
@@ -129,8 +132,8 @@ test.describe("v11 pengeluaran", () => {
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
     await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
-    await page.getByRole("button", { name: "Simpan Pengeluaran" }).click();
-    await expect(page.getByText("Pengeluaran berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 10_000 });
 
     // Urutan kolom persis seperti yang diminta: Vihara di antara Tanggal dan
     // Nama Pengeluaran, Rekening di antara Debet Dana dan Jumlah.
@@ -147,7 +150,8 @@ test.describe("v11 pengeluaran", () => {
       "Debet Dana",
       "Rekening",
       "Jumlah",
-      // Kolom aksi menyusul bersama tombol Detail (FV-15).
+      // Status menyusul bersama siklus persetujuan (FV-21), lalu aksi (FV-15).
+      "Status",
       "Aksi",
     ]);
 
@@ -277,10 +281,8 @@ test.describe("v11 pengeluaran", () => {
       buffer: Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n"),
     });
 
-    await page.getByRole("button", { name: "Simpan Pengeluaran" }).click();
-    await expect(page.getByText("berhasil disimpan beserta lampirannya")).toBeVisible({
-      timeout: 15_000,
-    });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 15_000 });
 
     // Baris itu bisa dibuka buktinya dari Semua Transaksi.
     await page.goto("/riwayat");

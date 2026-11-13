@@ -56,6 +56,6 @@ test.describe("v30 rbac", () => {
 
     await page.goto("/persetujuan");
     // CardHeader merender judulnya sebagai <p>, bukan heading.
-    await expect(page.getByText("Menunggu persetujuan")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Antrean persetujuan")).toBeVisible({ timeout: 10_000 });
   });
 });

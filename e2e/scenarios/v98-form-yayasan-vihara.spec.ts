@@ -87,7 +87,7 @@ test.describe("v98 form yayasan-vihara", () => {
 
     // Vihara belum dipilih → simpan tertahan, alasannya tampil.
     await expect(vihara).toHaveValue("");
-    await expect(page.getByRole("button", { name: /Simpan Pengeluaran/ })).toBeDisabled();
+    await expect(page.getByTestId("tombol-ajukan")).toBeDisabled();
     await expect(page.getByText("Pilih yayasan dan vihara dulu")).toBeVisible();
 
     // Begitu vihara dipilih, penahan YANG INI lepas. (Rekening sumber masih
@@ -100,7 +100,7 @@ test.describe("v98 form yayasan-vihara", () => {
       .poll(async () => (await rekening.locator("option").count()) > 1)
       .toBe(true);
     await rekening.selectOption({ index: 1 });
-    await expect(page.getByRole("button", { name: /Simpan Pengeluaran/ })).toBeEnabled();
+    await expect(page.getByTestId("tombol-ajukan")).toBeEnabled();
   });
 
   test("penguncian field mengikuti scope akun", async ({ page }) => {
@@ -217,8 +217,8 @@ test.describe("v98 form yayasan-vihara", () => {
     await expect.poll(async () => (await rekening.locator("option").count()) > 1).toBe(true);
     await rekening.selectOption({ index: 1 });
 
-    await page.getByRole("button", { name: /Simpan Pengeluaran/ }).click();
-    await expect(page.getByText("berhasil disimpan")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("tombol-submit").click();
+    await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 10_000 });
 
     // Baris terakhir harus milik vihara FORM (VVG), bukan header (VBM),
     // dan yayasannya ikut vihara itu.

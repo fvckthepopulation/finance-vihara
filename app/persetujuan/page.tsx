@@ -1,66 +1,117 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag } from "@/components/DanaTag";
+import { Field, Input, Select } from "@/components/Field";
 import { Toast } from "@/components/Toast";
-import { deletePembayaran, postPembayaran } from "@/lib/pembayaran";
-import { deletePenerimaan, postPenerimaan } from "@/lib/penerimaan";
-import { listTransactions, TransactionRow } from "@/lib/transactions";
+import { postPembayaran, rejectPembayaran, STATUS_LABEL, STATUS_TONE, PembayaranStatus } from "@/lib/pembayaran";
+import { postPenerimaan, rejectPenerimaan } from "@/lib/penerimaan";
+import {
+  listTransactions,
+  TransactionRow,
+  TransactionStatus,
+  TransactionTipe,
+} from "@/lib/transactions";
+import { fmtTanggal } from "@/lib/tanggal";
 import { useAuth } from "@/lib/useAuth";
-import { useVihara } from "@/lib/useVihara";
+import { getMyScope, ScopeVihara } from "@/lib/api";
 
 // ============================================================================
 // Persetujuan transaksi.
 //
-// Model izin memisahkan "boleh mencatat" (*.create) dari "boleh menyetujui"
-// (*.approve), tapi sebelumnya form selalu memposting begitu disimpan. Role
-// yang hanya punya .create karenanya mustahil dipakai: pembuatannya berhasil,
-// postingnya 403, dan yang tertinggal adalah draft yang tidak muncul di layar
-// mana pun.
+// Antrean berisi yang DIAJUKAN (submitted) — bukan semua draft. Draft adalah
+// pekerjaan setengah jadi milik pembuatnya dan tidak pernah masuk ke sini;
+// itulah pemisahan yang dulu tidak ada, sehingga data belum final ikut
+// mengantre.
 //
-// Halaman ini melengkapi separuh yang hilang: tempat pemegang .approve
-// melihat draft yang menunggu, lalu memposting atau menolaknya.
+// Penolakan mengembalikan transaksi ke pengajunya beserta alasan, bukan
+// menghapusnya: pengaju perlu tahu apa yang salah dan bisa memperbaikinya.
 // ============================================================================
 
 const fmtRp = (n: string | number) =>
   "Rp " + Math.round(typeof n === "string" ? Number(n) : n).toLocaleString("id-ID");
 
+const STATUS_PILIHAN: Array<{ nilai: TransactionStatus; label: string }> = [
+  { nilai: "submitted", label: "Menunggu Persetujuan" },
+  { nilai: "posted", label: "Disetujui" },
+  { nilai: "rejected", label: "Ditolak" },
+];
+
+const KOSONG = {
+  from: "",
+  to: "",
+  vihara: "",
+  tipe: "" as TransactionTipe | "",
+  status: "submitted" as TransactionStatus,
+  category: "",
+  pengaju: "",
+  cari: "",
+};
+
 export default function PersetujuanPage() {
   const { can } = useAuth();
-  const { viharaId, ready } = useVihara();
 
   const bisaPengeluaran = can("pembayaran.approve");
   const bisaPenerimaan = can("penerimaan.approve");
-  // Menolak berarti menghapus draftnya — izinnya sama dengan yang membuat.
-  const bisaTolakPengeluaran = can("pembayaran.create");
-  const bisaTolakPenerimaan = can("penerimaan.create");
 
+  const [f, setF] = useState({ ...KOSONG });
   const [rows, setRows] = useState<TransactionRow[]>([]);
+  const [viharas, setViharas] = useState<ScopeVihara[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
+  useEffect(() => {
+    getMyScope()
+      .then((d) => setViharas(d.viharas))
+      .catch(() => setViharas([]));
+  }, []);
+
   const reload = useCallback(() => {
-    if (!ready) return;
     setLoading(true);
     setError(null);
-    listTransactions({ status: "draft", vihara_id: viharaId, per_page: 100 })
+    listTransactions({
+      status: f.status,
+      tipe: f.tipe || undefined,
+      category: f.category || undefined,
+      from: f.from || undefined,
+      to: f.to || undefined,
+      vihara_id: f.vihara ? Number(f.vihara) : null,
+      submitted_by: f.pengaju ? Number(f.pengaju) : null,
+      search: f.cari || undefined,
+      per_page: 100,
+    })
       .then((r) => setRows(r.data))
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"))
       .finally(() => setLoading(false));
-  }, [viharaId, ready]);
+  }, [f]);
 
   useEffect(reload, [reload]);
 
-  function bolehSetujui(r: TransactionRow) {
+  // Daftar pengaju dirakit dari isi antrean — tidak perlu endpoint sendiri,
+  // dan isinya otomatis terbatas pada yang memang terlihat oleh pengguna.
+  const pengajuPilihan = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const r of rows) {
+      if (r.submitted_by_user_id && r.submitted_by) {
+        map.set(r.submitted_by_user_id, r.submitted_by);
+      }
+    }
+    return [...map.entries()];
+  }, [rows]);
+
+  const kategoriPilihan = useMemo(
+    () => [...new Set(rows.map((r) => r.category).filter(Boolean))],
+    [rows],
+  );
+
+  function bolehProses(r: TransactionRow) {
     return r.tipe === "Pengeluaran" ? bisaPengeluaran : bisaPenerimaan;
-  }
-  function bolehTolak(r: TransactionRow) {
-    return r.tipe === "Pengeluaran" ? bisaTolakPengeluaran : bisaTolakPenerimaan;
   }
 
   async function setujui(r: TransactionRow) {
@@ -79,19 +130,20 @@ export default function PersetujuanPage() {
   }
 
   async function tolak(r: TransactionRow) {
-    if (
-      !confirm(
-        `Tolak ${r.code}?\n\nDraft ini akan DIHAPUS beserta lampirannya. Tindakan ini tidak bisa dibatalkan.`,
-      )
-    ) {
+    const alasan = window.prompt(
+      `Tolak ${r.code}?\n\nTransaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
+    );
+    if (alasan == null) return;
+    if (alasan.trim().length < 3) {
+      setError("Alasan penolakan terlalu singkat.");
       return;
     }
     setBusy(r.id);
     setError(null);
     try {
-      if (r.tipe === "Pengeluaran") await deletePembayaran(r.id);
-      else await deletePenerimaan(r.id);
-      setToast(`${r.code} ditolak dan dihapus`);
+      if (r.tipe === "Pengeluaran") await rejectPembayaran(r.id, alasan.trim());
+      else await rejectPenerimaan(r.id, alasan.trim());
+      setToast(`${r.code} ditolak dan dikembalikan ke pengaju`);
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menolak");
@@ -100,11 +152,10 @@ export default function PersetujuanPage() {
     }
   }
 
+  const adaFilterTerpakai = JSON.stringify(f) !== JSON.stringify(KOSONG);
+
   return (
-    <AppShell
-      title="Persetujuan"
-      subtitle="Transaksi draft yang menunggu disetujui"
-    >
+    <AppShell title="Persetujuan" subtitle="Transaksi yang diajukan untuk disetujui">
       {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
 
       {error && (
@@ -113,12 +164,108 @@ export default function PersetujuanPage() {
         </p>
       )}
 
+      <Card className="mb-3.5">
+        <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-3 lg:grid-cols-4">
+          <Field label="Dari tanggal">
+            <Input type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} />
+          </Field>
+          <Field label="Sampai tanggal">
+            <Input type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} />
+          </Field>
+          <Field label="Vihara">
+            <Select
+              data-testid="filter-vihara"
+              value={f.vihara}
+              onChange={(e) => setF({ ...f, vihara: e.target.value })}
+            >
+              <option value="">Semua vihara</option>
+              {viharas.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Jenis transaksi">
+            <Select
+              data-testid="filter-tipe"
+              value={f.tipe}
+              onChange={(e) => setF({ ...f, tipe: e.target.value as TransactionTipe | "" })}
+            >
+              <option value="">Semua jenis</option>
+              <option value="Pengeluaran">Pengeluaran</option>
+              <option value="Penerimaan">Penerimaan</option>
+            </Select>
+          </Field>
+          <Field label="Status">
+            <Select
+              data-testid="filter-status"
+              value={f.status}
+              onChange={(e) => setF({ ...f, status: e.target.value as TransactionStatus })}
+            >
+              {STATUS_PILIHAN.map((s) => (
+                <option key={s.nilai} value={s.nilai}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Kategori">
+            <Select
+              data-testid="filter-kategori"
+              value={f.category}
+              onChange={(e) => setF({ ...f, category: e.target.value })}
+            >
+              <option value="">Semua kategori</option>
+              {kategoriPilihan.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Pengaju">
+            <Select
+              data-testid="filter-pengaju"
+              value={f.pengaju}
+              onChange={(e) => setF({ ...f, pengaju: e.target.value })}
+            >
+              <option value="">Semua pengaju</option>
+              {pengajuPilihan.map(([id, nama]) => (
+                <option key={id} value={id}>
+                  {nama}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Cari">
+            <Input
+              placeholder="Kode, nama, no. bukti…"
+              data-testid="filter-cari"
+              value={f.cari}
+              onChange={(e) => setF({ ...f, cari: e.target.value })}
+            />
+          </Field>
+        </div>
+        <div className="flex items-center justify-between border-t border-km-border bg-km-panel-soft px-4 py-2.5">
+          <span className="text-[11px] text-km-ink-muted">
+            {adaFilterTerpakai ? "Filter sedang dipakai" : "Menampilkan antrean bawaan"}
+          </span>
+          <Button
+            size="sm"
+            variant="default"
+            data-testid="reset-filter"
+            onClick={() => setF({ ...KOSONG })}
+          >
+            Reset filter
+          </Button>
+        </div>
+      </Card>
+
       <Card>
         <CardHeader
-          title="Menunggu persetujuan"
-          subtitle={
-            loading ? "Memuat…" : `${rows.length} transaksi draft dalam jangkauan Anda`
-          }
+          title="Antrean persetujuan"
+          subtitle={loading ? "Memuat…" : `${rows.length} transaksi`}
         />
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -130,21 +277,23 @@ export default function PersetujuanPage() {
                 <Th>Vihara</Th>
                 <Th>Keterangan</Th>
                 <Th>Kategori</Th>
+                <Th>Pengaju</Th>
                 <Th className="text-right">Jumlah</Th>
+                <Th>Status</Th>
                 <Th>Aksi</Th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={10} className="px-3 py-10 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
-                    Tidak ada transaksi yang menunggu persetujuan
+                  <td colSpan={10} className="px-3 py-10 text-center text-km-ink-muted">
+                    Tidak ada data
                   </td>
                 </tr>
               ) : (
@@ -153,7 +302,7 @@ export default function PersetujuanPage() {
                     key={`${r.tipe}-${r.id}`}
                     className="border-t border-km-border hover:bg-km-panel-soft"
                   >
-                    <Td className="whitespace-nowrap">{r.date.slice(0, 10)}</Td>
+                    <Td className="whitespace-nowrap">{fmtTanggal(r.date)}</Td>
                     <Td className="font-mono text-[11px]">{r.code}</Td>
                     <Td>
                       <span
@@ -168,24 +317,35 @@ export default function PersetujuanPage() {
                     </Td>
                     <Td className="whitespace-nowrap">{r.vihara_name ?? "—"}</Td>
                     <Td>
-                      {/* No. Bukti ikut ditampilkan: penyetuju mencocokkan
-                          draft dengan kuitansi fisiknya lewat nomor ini. */}
                       <p>{r.name ?? "—"}</p>
                       {(r.counterparty || r.reference) && (
                         <p className="text-[11px] text-km-ink-muted">
                           {[r.counterparty, r.reference].filter(Boolean).join(" · ")}
                         </p>
                       )}
+                      {r.status === "rejected" && r.reject_reason && (
+                        <p className="text-[11px] text-km-red-ink">
+                          Ditolak: {r.reject_reason}
+                        </p>
+                      )}
                     </Td>
                     <Td>
                       <DanaTag category={r.category} label={r.category_label} />
                     </Td>
+                    <Td className="whitespace-nowrap text-[11px]">{r.submitted_by ?? "—"}</Td>
                     <Td className="text-right font-mono tabular-nums font-medium">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
-                      <div className="flex gap-2">
-                        {bolehSetujui(r) ? (
+                      <Badge tone={STATUS_TONE[r.status as PembayaranStatus] ?? "neutral"}>
+                        {STATUS_LABEL[r.status as PembayaranStatus] ?? r.status}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      {r.status !== "submitted" ? (
+                        <span className="text-[11px] text-km-ink-muted">—</span>
+                      ) : bolehProses(r) ? (
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="success"
@@ -195,12 +355,6 @@ export default function PersetujuanPage() {
                           >
                             {busy === r.id ? "…" : "Setujui"}
                           </Button>
-                        ) : (
-                          <span className="text-[11px] text-km-ink-muted">
-                            Bukan wewenang Anda
-                          </span>
-                        )}
-                        {bolehTolak(r) && (
                           <Button
                             size="sm"
                             variant="default"
@@ -210,8 +364,10 @@ export default function PersetujuanPage() {
                           >
                             Tolak
                           </Button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-km-ink-muted">Bukan wewenang Anda</span>
+                      )}
                     </Td>
                   </tr>
                 ))

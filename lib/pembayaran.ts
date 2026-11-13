@@ -38,17 +38,30 @@ function humanize(key: string): string {
   return key.split("_").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
 }
 
-export type PembayaranStatus = "draft" | "posted" | "cancelled";
+export type PembayaranStatus =
+  | "draft"
+  | "submitted"
+  | "posted"
+  | "rejected"
+  | "cancelled";
 
+/** Label siklus draft -> pengajuan -> persetujuan, sesuai nama di laporan QC. */
 export const STATUS_LABEL: Record<PembayaranStatus, string> = {
   draft: "Draft",
-  posted: "Diposting",
+  submitted: "Menunggu Persetujuan",
+  posted: "Disetujui",
+  rejected: "Ditolak",
   cancelled: "Dibatalkan",
 };
 
-export const STATUS_TONE: Record<PembayaranStatus, "neutral" | "info" | "success" | "danger"> = {
+export const STATUS_TONE: Record<
+  PembayaranStatus,
+  "neutral" | "info" | "warn" | "success" | "danger"
+> = {
   draft: "neutral",
+  submitted: "warn",
   posted: "success",
+  rejected: "danger",
   cancelled: "danger",
 };
 
@@ -58,7 +71,8 @@ export type Pembayaran = {
   date: string;
   method: PembayaranMethod;
   source_account_code: string;
-  category: PembayaranCategory;
+  /** Boleh kosong HANYA saat draft: true. */
+  category?: PembayaranCategory;
   entity_id: number;
   payee_id: number | null;
   payee_name: string | null;
@@ -82,6 +96,13 @@ export type Pembayaran = {
   approved_by_name?: string | null;
   voided_at?: string | null;
   void_reason?: string | null;
+  /** Jejak siklus — penyetuju yang sah berasal dari sini, bukan dari teks. */
+  submitted_at?: string | null;
+  submitted_by?: { id: number; name: string } | null;
+  posted_by?: { id: number; name: string } | null;
+  rejected_at?: string | null;
+  rejected_by?: { id: number; name: string } | null;
+  reject_reason?: string | null;
   payee?: { id: number; code: string; name: string } | null;
   source_account?: { code: string; name: string };
   debit_account?: { code: string; name: string };
@@ -127,13 +148,15 @@ export type CreatePembayaranInput = {
   bank_account_id?: number;
   /** @deprecated Pakai bank_account_id; tersisa untuk kompat lama. */
   source_account_code?: string;
-  category: PembayaranCategory;
+  /** Boleh kosong HANYA saat draft: true. */
+  category?: PembayaranCategory;
   entity_id?: number;
   payee_id?: number | null;
   payee_name?: string | null;
   debit_account_code?: string | null;
   reference?: string | null;
-  amount: number;
+  /** Boleh kosong HANYA saat draft: true. */
+  amount?: number;
   description?: string | null;
   /** Nama pengeluaran — dari master transaction-names (form mockup). */
   name?: string;
@@ -141,6 +164,11 @@ export type CreatePembayaranInput = {
   approved_by_name?: string | null;
   /** Vihara — wajib utk superadmin; user vihara tetap: server memaksa. */
   vihara_id?: number;
+  /**
+   * true = simpan sebagai draft setengah jadi. Server melonggarkan validasi
+   * (cukup tanggal + vihara); kelengkapan ditegakkan saat diajukan/disetujui.
+   */
+  draft?: boolean;
 };
 
 export async function createPembayaran(input: CreatePembayaranInput): Promise<Pembayaran> {
@@ -189,6 +217,30 @@ export async function fetchPembayaranAttachment(id: number): Promise<Blob> {
   const res = await fetch(`${API_URL}/api/pembayaran/${id}/attachment`, { headers });
   if (!res.ok) throw new Error(`Gagal membuka lampiran (HTTP ${res.status})`);
   return res.blob();
+}
+
+/** Ubah draft / yang ditolak. */
+export async function updatePembayaran(
+  id: number,
+  input: Partial<CreatePembayaranInput>,
+): Promise<Pembayaran> {
+  return api<Pembayaran>(`/api/pembayaran/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Ajukan draft ke antrean persetujuan. */
+export async function submitPembayaran(id: number): Promise<Pembayaran> {
+  return api<Pembayaran>(`/api/pembayaran/${id}/submit`, { method: "POST" });
+}
+
+/** Tolak pengajuan, alasan wajib. */
+export async function rejectPembayaran(id: number, reason: string): Promise<Pembayaran> {
+  return api<Pembayaran>(`/api/pembayaran/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function postPembayaran(id: number): Promise<Pembayaran> {
