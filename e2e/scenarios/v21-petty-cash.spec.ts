@@ -98,16 +98,26 @@ test.describe("v21 kas kecil", () => {
     await page.goto("/petty-cash");
     await page.getByTestId("form-vihara").selectOption(String(viharaVvg));
 
+    // Satu mutasi Lili dibuat lebih dulu. Tanpa ini pengujiannya hampa:
+    // kalau Lili memang belum punya mutasi, saringan apa pun terlihat "benar".
+    const form = page.locator("form").filter({ hasText: "Penggunaan Kas Kecil" });
+    await selectByLabelRegex(form.getByLabel("PIC Kas Kecil"), /Lili/);
+    await form.getByLabel("Keperluan").fill(uniq("E2E-LILI"));
+    await form.getByLabel("Jumlah (Rp)").fill("9000");
+    await form.getByLabel("No. Bukti / Kuitansi").fill(uniq("KWT-LILI"));
+    await form.getByRole("button", { name: "Catat Penggunaan" }).click();
+    await expect(page.getByText(/tercatat/i).first()).toBeVisible({ timeout: 10_000 });
+
     const filter = page.getByLabel("Filter PIC");
     await expect(filter).toBeVisible({ timeout: 15_000 });
     await selectByLabelRegex(filter, /Lili/);
-    await page.waitForTimeout(800);
 
     const rows = page.locator("tbody tr");
+    await expect(rows.first()).toContainText("Lili", { timeout: 15_000 });
     const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
     for (let i = 0; i < Math.min(count, 10); i++) {
       const text = await rows.nth(i).innerText();
-      if (/Tidak ada|Belum ada/i.test(text)) continue;
       expect(text).toContain("Lili");
       expect(text).not.toContain("Epi");
     }

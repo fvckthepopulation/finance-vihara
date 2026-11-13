@@ -1,4 +1,4 @@
-import { api, ScopeType } from "./api";
+import { api, Paginated, ScopeType } from "./api";
 
 export type AdminUserVihara = { id: number; code: string; name: string };
 
@@ -37,6 +37,17 @@ export type AdminRole = {
 export const listAdminUsers = (q = "") =>
   api<AdminUser[]>(`/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 
+/** Versi berhalaman untuk layar Admin → Users. */
+export const listAdminUsersPaginated = (
+  params: { q?: string; page?: number; per_page?: number } = {},
+) => {
+  const sp = new URLSearchParams({ paginate: "1" });
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.per_page) sp.set("per_page", String(params.per_page));
+  return api<Paginated<AdminUser>>(`/api/admin/users?${sp}`);
+};
+
 export type CreateUserPayload = {
   name: string;
   email: string;
@@ -71,8 +82,8 @@ export const updateAdminUser = (id: number, payload: UpdateUserPayload) =>
 export const deleteAdminUser = (id: number) =>
   api<{ message: string }>(`/api/admin/users/${id}`, { method: "DELETE" });
 
-export const listAdminRoles = () =>
-  api<AdminRole[]>(`/api/admin/roles`);
+export const listAdminRoles = (q = "") =>
+  api<AdminRole[]>(`/api/admin/roles${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 
 export const getPermissionsCatalog = () =>
   api<{

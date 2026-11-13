@@ -35,7 +35,7 @@ test.describe("v12 riwayat", () => {
 
     // Cari di riwayat: coba catatan unik dulu, fallback ke nama.
     await page.goto("/riwayat");
-    const search = page.getByPlaceholder("Cari keterangan...");
+    const search = page.getByTestId("cari-transaksi");
     await search.fill(catatan);
     await page.waitForTimeout(1000);
     let rows = page.locator("tbody tr");

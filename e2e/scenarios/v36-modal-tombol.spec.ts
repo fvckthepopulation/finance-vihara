@@ -87,7 +87,7 @@ test.describe("v36 tombol modal", () => {
 
   for (const kasus of [
     { url: "/admin/coa", tombolBuka: /Akun baru/i, nama: "COA" },
-    { url: "/admin/entities", tombolBuka: /Entitas baru/i, nama: "Entities" },
+    { url: "/admin/entities", tombolBuka: /Yayasan baru/i, nama: "Yayasan" },
     { url: "/admin/vihara", tombolBuka: /Vihara baru/i, nama: "Vihara" },
   ]) {
     test(`${kasus.nama}: tombol modal terjangkau di layar pendek`, async ({ page }) => {

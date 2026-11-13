@@ -24,7 +24,7 @@ const PAGES: Array<{ path: string; title: string }> = [
   { path: "/admin/vihara", title: "Admin — Vihara" },
   { path: "/admin/users", title: "Admin — Users" },
   { path: "/admin/roles", title: "Admin — Roles" },
-  { path: "/admin/entities", title: "Master Entitas" },
+  { path: "/admin/entities", title: "Master Yayasan" },
 ];
 
 async function assertPage(page: Page, path: string, title: string) {

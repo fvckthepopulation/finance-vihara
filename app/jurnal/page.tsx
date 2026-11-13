@@ -5,10 +5,12 @@ import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
-import { Field, Input, Select, Textarea } from "@/components/Field";
+import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
+import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 import { fmtTanggal } from "@/lib/tanggal";
 import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { Modal } from "@/components/Modal";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { CoaAccount, listCoa } from "@/lib/coa";
 import {
   CreateJournalEntryPayload,
@@ -21,7 +23,6 @@ import {
   journalSourceLabel,
   listJournalEntries,
 } from "@/lib/journal";
-import { MasterEntity, listEntities } from "@/lib/masters";
 import { useAuth } from "@/lib/useAuth";
 
 const fmtRp = (n: string | number) =>
@@ -45,11 +46,19 @@ export default function JurnalPage() {
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
-  const [entities, setEntities] = useState<MasterEntity[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [viewId, setViewId] = useState<number | null>(null);
   // FV-18 poin 4: dari jurnal bisa membuka detail transaksi sumbernya.
   const [sumberId, setSumberId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    from: null as number | null,
+    to: null as number | null,
+  });
 
   function reload() {
     setLoading(true);
@@ -59,18 +68,32 @@ export default function JurnalPage() {
       from: from || undefined,
       to: to || undefined,
       q: q || undefined,
-      per_page: 50,
+      page,
+      per_page: perPage,
     })
-      .then((p) => setRows(p.data))
+      .then((p) => {
+        setRows(p.data);
+        setMeta({
+          current_page: p.current_page,
+          last_page: p.last_page,
+          total: p.total,
+          from: p.from,
+          to: p.to,
+        });
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"))
       .finally(() => setLoading(false));
   }
 
-  useEffect(reload, [source, status, from, to, q]);
+  useEffect(reload, [source, status, from, to, q, page, perPage]);
+
+  // Saringan atau kata kunci berubah → kembali ke halaman 1.
+  useEffect(() => {
+    setPage(1);
+  }, [source, status, from, to, q, perPage]);
 
   useEffect(() => {
     listCoa({ active: true }).then(setAccounts).catch(() => {});
-    listEntities({ active: true }).then(setEntities).catch(() => {});
   }, []);
 
   async function handleVoid(r: { id: number }) {
@@ -141,13 +164,16 @@ export default function JurnalPage() {
           <span className="text-[11px] text-km-ink-muted">s/d</span>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="min-w-36" />
           <Input
+            data-testid="cari-jurnal"
+            aria-label="Cari jurnal"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari deskripsi…"
+            placeholder="Cari no. jurnal atau keterangan…"
             className="min-w-48 max-w-xs"
           />
           <p className="ml-auto text-[11px] text-km-ink-muted">
-            {loading ? "Memuat…" : `${rows.length} entry`}
+            {/* Jumlah SELURUH entry hasil saringan, bukan baris di halaman ini. */}
+            {loading ? "Memuat…" : `${meta.total} entry`}
           </p>
         </div>
 
@@ -187,7 +213,11 @@ export default function JurnalPage() {
                     )}
                   </Td>
                   <Td className="whitespace-nowrap text-[11px]">
-                    {r.vihara?.name ?? "—"}
+                    {/* Jurnal lama (dan jurnal pusat) belum punya vihara —
+                        disebut apa adanya, bukan tanda hubung (FV-35). */}
+                    {r.vihara?.name ?? (
+                      <span className="text-km-ink-muted">Tingkat yayasan</span>
+                    )}
                   </Td>
                   <Td>
                     {/* Deskripsi tersimpan hanya memuat kode + nama kategori,
@@ -280,12 +310,23 @@ export default function JurnalPage() {
             </tbody>
           </table>
         </div>
+        <div className="border-t border-km-border">
+          <Pagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+            onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={setPerPage}
+          />
+        </div>
       </Card>
 
       {showForm && (
         <ManualJournalForm
           accounts={accounts}
-          entities={entities}
           onClose={() => setShowForm(false)}
           onSaved={() => {
             setShowForm(false);
@@ -318,24 +359,19 @@ type LineDraft = {
 const blankLine = (): LineDraft => ({ account_code: "", debit: "", credit: "", description: "" });
 
 function ManualJournalForm({
-  accounts, entities, onClose, onSaved,
+  accounts, onClose, onSaved,
 }: {
   accounts: CoaAccount[];
-  entities: MasterEntity[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [entityId, setEntityId] = useState<number | "">(entities[0]?.id ?? "");
+  const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
   const [entryDate, setEntryDate] = useState(today());
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([blankLine(), blankLine()]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (entityId === "" && entities[0]) setEntityId(entities[0].id);
-  }, [entities, entityId]);
 
   const accountsActive = useMemo(
     () => accounts.filter((a) => a.active && !a.is_header).sort((a, b) => a.code.localeCompare(b.code)),
@@ -355,13 +391,15 @@ function ManualJournalForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!entityId) { setError("Pilih entitas dulu."); return; }
+    if (!scope.entityId) { setError("Pilih yayasan dulu."); return; }
+    if (!scope.viharaId) { setError("Pilih vihara dulu."); return; }
     if (!balanced) { setError("Jurnal belum balance / total 0."); return; }
     setError(null);
     setPending(true);
     try {
       const payload: CreateJournalEntryPayload = {
-        entity_id: Number(entityId),
+        entity_id: scope.entityId,
+        vihara_id: scope.viharaId,
         entry_date: entryDate,
         description: description.trim(),
         reference: reference.trim() || undefined,
@@ -398,14 +436,14 @@ function ManualJournalForm({
     >
 
         <div className="space-y-3 px-4 py-4">
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Entitas">
-              <Select required value={String(entityId)} onChange={(e) => setEntityId(Number(e.target.value))}>
-                {entities.map((en) => (
-                  <option key={en.id} value={en.id}>{en.code} · {en.legal_name}</option>
-                ))}
-              </Select>
-            </Field>
+          {/* Yayasan + Vihara memakai komponen yang sama dengan form transaksi
+              (FV-34/FV-35): istilahnya seragam, pilihannya dari /api/my-scope
+              sehingga hanya berisi yang boleh diakses, dan satu-satunya
+              pilihan langsung terpilih sendiri. */}
+          <div className="grid grid-cols-2 gap-3">
+            <YayasanViharaFields value={scope} onChange={setScope} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Tanggal">
               <Input type="date" required value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
             </Field>
@@ -451,17 +489,19 @@ function ManualJournalForm({
                       <Input value={l.description} onChange={(e) => update(i, "description", e.target.value)} placeholder="opsional" />
                     </Td>
                     <Td>
-                      <Input
-                        type="number" step="0.01" min="0" inputMode="decimal"
-                        value={l.debit} onChange={(e) => update(i, "debit", e.target.value)}
+                      <MoneyInput
+                        aria-label={`Debit baris ${i + 1}`}
+                        value={l.debit === "" ? 0 : Number(l.debit)}
+                        onChange={(n) => update(i, "debit", n ? String(n) : "")}
                         className="text-right"
                         disabled={Number(l.credit) > 0}
                       />
                     </Td>
                     <Td>
-                      <Input
-                        type="number" step="0.01" min="0" inputMode="decimal"
-                        value={l.credit} onChange={(e) => update(i, "credit", e.target.value)}
+                      <MoneyInput
+                        aria-label={`Kredit baris ${i + 1}`}
+                        value={l.credit === "" ? 0 : Number(l.credit)}
+                        onChange={(n) => update(i, "credit", n ? String(n) : "")}
                         className="text-right"
                         disabled={Number(l.debit) > 0}
                       />

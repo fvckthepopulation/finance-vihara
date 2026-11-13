@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { DanaTag, DANA_CATEGORY_LABEL } from "@/components/DanaTag";
 import { KmLink } from "@/components/KmLink";
-import { Pagination } from "@/components/Pagination";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import {
   exportTransactionsCsv,
   fetchTransactionAttachment,
@@ -59,6 +59,7 @@ export default function RiwayatPage() {
   const [sumber, setSumber] = useState<TransactionSource | "">("");
   const [status, setStatus] = useState<TransactionStatus | "">("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
 
   const [res, setRes] = useState<TransactionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +79,7 @@ export default function RiwayatPage() {
   // Reset ke halaman 1 saat filter berubah.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, tipe, category, from, to, sumber, status, viharaId]);
+  }, [debouncedSearch, tipe, category, from, to, sumber, status, viharaId, perPage]);
 
   const filterParams: ListTransactionsParams = {
     search: debouncedSearch || undefined,
@@ -106,6 +107,7 @@ export default function RiwayatPage() {
       status: status || undefined,
       vihara_id: viharaId,
       page,
+      per_page: perPage,
     })
       .then((r) => {
         if (alive) setRes(r);
@@ -130,6 +132,7 @@ export default function RiwayatPage() {
     sumber,
     status,
     page,
+    perPage,
     // Dinaikkan sesudah pembatalan supaya daftarnya dimuat ulang.
     revisi,
   ]);
@@ -201,10 +204,12 @@ export default function RiwayatPage() {
         {/* Filter bar */}
         <div className="flex flex-wrap items-center gap-2 border-b border-km-border bg-km-bg px-4 py-2.5">
           <input
+            data-testid="cari-transaksi"
+            aria-label="Cari transaksi"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari keterangan..."
-            className={`${filterInputClass} w-full sm:max-w-[200px]`}
+            placeholder="Cari nama, PIC, no. bukti…"
+            className={`${filterInputClass} w-full sm:max-w-[220px]`}
           />
           <select
             value={tipe}
@@ -329,7 +334,7 @@ export default function RiwayatPage() {
                       <DanaTag category={r.category} label={r.category_label} />
                     </Td>
                     <Td
-                      className={`whitespace-nowrap text-right font-mono tabular-nums font-medium ${
+                      className={`whitespace-nowrap text-right tabular-nums font-medium ${
                         r.tipe === "Penerimaan" ? "text-km-green" : "text-km-red"
                       }`}
                     >
@@ -391,6 +396,8 @@ export default function RiwayatPage() {
               from={res.from}
               to={res.to}
               onChange={setPage}
+              perPage={perPage}
+              onPerPageChange={setPerPage}
             />
           </div>
         )}

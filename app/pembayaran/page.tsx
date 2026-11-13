@@ -7,6 +7,7 @@ import { Badge } from "@/components/Badge";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag, DANA_CATEGORY_LABEL, debetDanaCategory } from "@/components/DanaTag";
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
+import { PenerimaInput } from "@/components/PenerimaInput";
 import { Toast } from "@/components/Toast";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 import { PembayaranDetail } from "@/components/PembayaranDetail";
@@ -53,6 +54,9 @@ export default function PembayaranPage() {
   const [name, setName] = useState("");
   const [sourceAccount, setSourceAccount] = useState("");
   const [payeeName, setPayeeName] = useState("");
+  // Terisi kalau nama yang dipakai cocok dengan master (FV-31); dikirim ke
+  // server sebagai payee_id supaya rekap per penerima bisa diandalkan.
+  const [payeeId, setPayeeId] = useState<number | null>(null);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -86,7 +90,10 @@ export default function PembayaranPage() {
       return;
     }
     let alive = true;
-    listViharaBankAccounts(formViharaId)
+    // Hanya rekening jenis Bank: metode pembayaran di layar ini memang
+    // Transfer Bank (pengeluaran tunai lewat Kas Kecil), jadi kas tunai tidak
+    // boleh ikut muncul di "Transfer dari Rekening" (FV-30).
+    listViharaBankAccounts(formViharaId, "bank")
       .then((list) => alive && setBankAccounts(list.filter((b) => b.active)))
       .catch(() => alive && setBankAccounts([]));
     return () => {
@@ -153,6 +160,7 @@ export default function PembayaranPage() {
     setName("");
     setSourceAccount("");
     setPayeeName("");
+    setPayeeId(null);
     setReference("");
     setNotes("");
     setAttachment(null);
@@ -195,6 +203,7 @@ export default function PembayaranPage() {
         method: "transfer",
         bank_account_id: sourceAccount ? Number(sourceAccount) : undefined,
         payee_name: payeeName || null,
+        payee_id: payeeId,
         reference: reference || null,
         description: notes || null,
         vihara_id: scope.viharaId,
@@ -321,11 +330,18 @@ export default function PembayaranPage() {
                 ))}
               </Select>
             </Field>
-            <Field label="Dibayarkan kepada / PIC">
-              <Input
+            <Field
+              label="Dibayarkan kepada / PIC"
+              hint="Ketik untuk melihat saran dari master; nama baru tetap boleh diisi bebas."
+            >
+              <PenerimaInput
                 value={payeeName}
-                placeholder="Nama vendor / penerima"
-                onChange={(e) => setPayeeName(e.target.value)}
+                payeeId={payeeId}
+                onChange={(nama, id) => {
+                  setPayeeName(nama);
+                  setPayeeId(id);
+                }}
+                onError={setError}
               />
             </Field>
             <Field label="No. Bukti / Referensi">
@@ -420,6 +436,15 @@ export default function PembayaranPage() {
       <Card className="mt-3.5">
         <CardHeader
           title="Pengeluaran Hari Ini"
+          subtitle={
+            <a
+              href="/pengeluaran"
+              className="text-km-blue hover:underline"
+              data-testid="link-semua-pengeluaran"
+            >
+              Lihat semua pengeluaran →
+            </a>
+          }
           right={
             <label className="flex items-center gap-2 text-[11px] text-km-ink-muted">
               Status
@@ -483,10 +508,10 @@ export default function PembayaranPage() {
                     <Td>
                       <DanaTag category={debetDanaCategory(r.category)} />
                     </Td>
-                    <Td className="whitespace-nowrap font-mono text-[11px] text-km-ink-soft">
+                    <Td className="whitespace-nowrap tabular-nums text-[11px] text-km-ink-soft">
                       {r.bank_label ?? "—"}
                     </Td>
-                    <Td className="text-right font-mono tabular-nums font-medium text-km-red">
+                    <Td className="text-right tabular-nums font-medium text-km-red">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>

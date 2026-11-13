@@ -217,7 +217,7 @@ export default function DanaPage() {
                     <Td className="max-w-[220px] truncate text-km-ink-muted">
                       {r.description ?? "—"}
                     </Td>
-                    <Td className="whitespace-nowrap text-right font-mono tabular-nums font-medium text-km-green">
+                    <Td className="whitespace-nowrap text-right tabular-nums font-medium text-km-green">
                       {fmtRp(r.amount)}
                     </Td>
                   </tr>

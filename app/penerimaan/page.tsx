@@ -337,7 +337,18 @@ export default function PenerimaanPage() {
       </form>
 
       <Card className="mt-3.5">
-        <CardHeader title="Penerimaan Hari Ini" />
+        <CardHeader
+          title="Penerimaan Hari Ini"
+          subtitle={
+            <a
+              href="/riwayat"
+              className="text-km-blue hover:underline"
+              data-testid="link-semua-penerimaan"
+            >
+              Lihat semua transaksi →
+            </a>
+          }
+        />
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
             <thead className="bg-km-bg">
@@ -373,7 +384,7 @@ export default function PenerimaanPage() {
                     <Td>
                       <GrayTag>{METHOD_LABEL[r.method] ?? r.method}</GrayTag>
                     </Td>
-                    <Td className="text-right font-mono tabular-nums font-medium text-km-green">
+                    <Td className="text-right tabular-nums font-medium text-km-green">
                       {fmtRp(r.amount)}
                     </Td>
                   </tr>

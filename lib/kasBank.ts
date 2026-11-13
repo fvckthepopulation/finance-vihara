@@ -11,29 +11,86 @@ export const num = (v: string | number | null | undefined): number => {
 // Master rekening bank per vihara
 // ============================================================================
 
+/** Jenis rekening (FV-30): rekening bank, atau kas tunai tanpa nomor. */
+export type JenisRekening = "bank" | "cash";
+
+export const JENIS_REKENING: Record<JenisRekening, string> = {
+  bank: "Bank",
+  cash: "Kas Tunai",
+};
+
 export type ViharaBankAccount = {
   id: number;
   vihara_id: number;
+  type: JenisRekening;
   bank_name: string;
-  account_number: string;
-  account_name: string;
+  account_number: string | null;
+  account_name: string | null;
   coa_account_code: string | null;
+  description?: string | null;
   active: boolean;
 };
 
-export const listViharaBankAccounts = (viharaId?: number | null) => {
+/**
+ * Lookup untuk dropdown. `jenis` dipakai form Input Pengeluaran: metode
+ * pembayarannya Transfer Bank, jadi kas tunai tidak boleh ikut muncul.
+ */
+export const listViharaBankAccounts = (
+  viharaId?: number | null,
+  jenis?: JenisRekening,
+) => {
   const sp = new URLSearchParams();
   if (viharaId != null) sp.set("vihara_id", String(viharaId));
+  if (jenis) sp.set("type", jenis);
   return api<{ data: ViharaBankAccount[] }>(
     `/api/masters/vihara-bank-accounts${sp.toString() ? `?${sp}` : ""}`,
   ).then((r) => r.data);
 };
 
+/** Satu baris di layar Master Rekening — sudah berisi nama vihara & akun COA. */
+export type MasterRekeningRow = ViharaBankAccount & {
+  vihara_name: string | null;
+  type_label: string;
+  coa_account_name: string | null;
+  label: string;
+  /** Sudah dipakai transaksi → hanya boleh dinonaktifkan, tidak dihapus. */
+  in_use: boolean;
+};
+
+export type MasterRekeningPage = {
+  data: MasterRekeningRow[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+};
+
+export const listMasterRekening = (params: {
+  q?: string;
+  type?: JenisRekening | "";
+  active?: "" | "1" | "0";
+  vihara_id?: number | null;
+  page?: number;
+  per_page?: number;
+} = {}) => {
+  const sp = new URLSearchParams();
+  if (params.q) sp.set("q", params.q);
+  if (params.type) sp.set("type", params.type);
+  if (params.active !== undefined && params.active !== "") sp.set("active", params.active);
+  if (params.vihara_id != null) sp.set("vihara_id", String(params.vihara_id));
+  if (params.page) sp.set("page", String(params.page));
+  if (params.per_page) sp.set("per_page", String(params.per_page));
+  return api<MasterRekeningPage>(`/api/master-rekening${sp.toString() ? `?${sp}` : ""}`);
+};
+
 export type ViharaBankAccountInput = {
+  type?: JenisRekening;
   bank_name: string;
-  account_number: string;
-  account_name: string;
+  account_number?: string | null;
+  account_name?: string | null;
   coa_account_code?: string;
+  description?: string | null;
 };
 
 export const createViharaBankAccount = (viharaId: number, payload: ViharaBankAccountInput) =>

@@ -5,12 +5,13 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, MoneyInput, Select } from "@/components/Field";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
 import { bankBrand, listViharaBankAccounts, num, ViharaBankAccount } from "@/lib/kasBank";
 import {
   createPettyCash,
   getPettyCashSummary,
-  listPettyCash,
+  listPettyCashPaginated,
   listPettyCashPics,
   pettyCashDate,
   PettyCashEntry,
@@ -59,8 +60,12 @@ export default function PettyCashPage() {
   const [pics, setPics] = useState<PettyCashPic[]>([]);
   const [bankAccounts, setBankAccounts] = useState<ViharaBankAccount[]>([]);
   const [rows, setRows] = useState<PettyCashEntry[]>([]);
+  const [halaman, setHalaman] = useState({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
   const [rowsLoading, setRowsLoading] = useState(true);
   const [filterPic, setFilterPic] = useState("");
+  const [cari, setCari] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const [toast, setToast] = useState<ToastMsg | null>(null);
 
   const reloadSummary = useCallback(() => {
@@ -73,14 +78,31 @@ export default function PettyCashPage() {
   const reloadRows = useCallback(() => {
     if (!ready) return;
     setRowsLoading(true);
-    listPettyCash({
+    // Riwayat dipotong di server: daftar mutasi kas kecil ikut tumbuh tiap
+    // bulan, jadi tidak semuanya ditarik lalu dipotong di peramban.
+    listPettyCashPaginated({
       vihara_id: viharaId,
       pic_id: filterPic ? Number(filterPic) : undefined,
+      q: cari || undefined,
+      page,
+      per_page: perPage,
     })
-      .then(setRows)
-      .catch(() => setRows([]))
+      .then((res) => {
+        setRows(res.data);
+        setHalaman({
+          current_page: res.current_page,
+          last_page: res.last_page,
+          total: res.total,
+          from: res.from,
+          to: res.to,
+        });
+      })
+      .catch(() => {
+        setRows([]);
+        setHalaman({ current_page: 1, last_page: 1, total: 0, from: null, to: null });
+      })
       .finally(() => setRowsLoading(false));
-  }, [viharaId, ready, filterPic]);
+  }, [viharaId, ready, filterPic, cari, page, perPage]);
 
   useEffect(() => {
     reloadSummary();
@@ -107,7 +129,13 @@ export default function PettyCashPage() {
 
   useEffect(() => {
     setFilterPic("");
+    setCari("");
   }, [viharaId]);
+
+  // Ganti saringan → balik ke halaman 1, supaya tidak terdampar di halaman kosong.
+  useEffect(() => {
+    setPage(1);
+  }, [viharaId, filterPic, cari, perPage]);
 
   // Urutan warna PIC konsisten di kartu ringkasan + tag riwayat.
   const picColorIndex = useMemo(() => {
@@ -227,19 +255,29 @@ export default function PettyCashPage() {
           <CardHeader
             title="Riwayat Mutasi Kas Kecil"
             right={
-              <Select
-                value={filterPic}
-                onChange={(e) => setFilterPic(e.target.value)}
-                className="max-w-36"
-                aria-label="Filter PIC"
-              >
-                <option value="">Semua PIC</option>
-                {pics.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
+              <div className="flex items-center gap-2">
+                <Input
+                  data-testid="cari-kaskecil"
+                  value={cari}
+                  placeholder="Cari keterangan, no. bukti, PIC…"
+                  onChange={(e) => setCari(e.target.value)}
+                  className="max-w-56"
+                  aria-label="Cari mutasi kas kecil"
+                />
+                <Select
+                  value={filterPic}
+                  onChange={(e) => setFilterPic(e.target.value)}
+                  className="max-w-36"
+                  aria-label="Filter PIC"
+                >
+                  <option value="">Semua PIC</option>
+                  {pics.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             }
           />
           <div className="overflow-x-auto">
@@ -264,7 +302,7 @@ export default function PettyCashPage() {
                 ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
-                      Belum ada mutasi kas kecil
+                      {cari || filterPic ? "Data tidak ditemukan" : "Belum ada mutasi kas kecil"}
                     </td>
                   </tr>
                 ) : (
@@ -318,10 +356,10 @@ export default function PettyCashPage() {
                             )}
                           </span>
                         </Td>
-                        <Td className="text-right font-mono tabular-nums text-km-green">
+                        <Td className="text-right tabular-nums text-km-green">
                           {isTopup ? fmtRp(amount) : "—"}
                         </Td>
-                        <Td className="text-right font-mono tabular-nums text-km-red">
+                        <Td className="text-right tabular-nums text-km-red">
                           {!isTopup ? fmtRp(amount) : "—"}
                         </Td>
                         <Td className="text-[11px] text-km-ink-muted">{r.reference || "—"}</Td>
@@ -345,6 +383,18 @@ export default function PettyCashPage() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="border-t border-km-border">
+            <Pagination
+              currentPage={halaman.current_page}
+              lastPage={halaman.last_page}
+              total={halaman.total}
+              from={halaman.from}
+              to={halaman.to}
+              onChange={setPage}
+              perPage={perPage}
+              onPerPageChange={setPerPage}
+            />
           </div>
         </Card>
       </div>

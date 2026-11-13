@@ -102,6 +102,21 @@ export function listTransactions(
   );
 }
 
+/**
+ * Antrean persetujuan — data yang sama, endpoint terpisah.
+ *
+ * /api/transactions dijaga izin `transaksi.view` (FV-28, menu Semua
+ * Transaksi). Role yang hanya boleh MENYETUJUI tidak otomatis punya izin itu,
+ * jadi layar Persetujuan memakai /api/approvals yang menerima
+ * `transaksi.view` ATAU `pembayaran.approve` ATAU `penerimaan.approve`.
+ */
+export function listApprovals(
+  params: ListTransactionsParams = {},
+): Promise<TransactionsResponse> {
+  const sp = buildQuery(params);
+  return api<TransactionsResponse>(`/api/approvals${sp.toString() ? `?${sp}` : ""}`);
+}
+
 /** Unduh CSV riwayat transaksi dengan filter yang sama seperti daftar. */
 /**
  * Ambil lampiran bukti sebuah baris transaksi. Endpointnya berbeda per tipe,

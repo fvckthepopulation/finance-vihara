@@ -156,7 +156,7 @@ test.describe("v42 siklus persetujuan", () => {
 
     // Filter yang tidak cocok memberi keterangan, bukan error.
     await page.getByTestId("filter-cari").fill("TIDAK-ADA-INI-XYZ");
-    await expect(page.getByText("Tidak ada data")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Data tidak ditemukan")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("reset-filter").click();
     await expect(page.getByTestId("filter-status")).toHaveValue("submitted");
   });

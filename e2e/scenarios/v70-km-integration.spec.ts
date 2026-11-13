@@ -122,7 +122,7 @@ test.describe("v70 KM integration", () => {
 
     // ── 3. /riwayat: cari by ref → baris bertanda KalyanaMitta ──
     await page.goto("/riwayat");
-    await page.getByPlaceholder("Cari keterangan...").fill(donationRef);
+    await page.getByTestId("cari-transaksi").fill(donationRef);
     const riwayatRow = page
       .locator("tbody tr")
       .filter({ hasText: "KalyanaMitta" })

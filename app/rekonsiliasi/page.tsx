@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input, Select } from "@/components/Field";
+import { Pagination, usePaginasiLokal } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
 import { num } from "@/lib/kasBank";
 import { KmLink } from "@/components/KmLink";
@@ -306,6 +307,23 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
   const selisih = Math.abs(saldo - pendingTotal);
   const cocok = selisih < 1;
 
+  // Pencarian + pagination rincian (FV-26/FV-27). Dilakukan di peramban:
+  // angka ringkasan dan uji "saldo 1160 = total escrow" di atas harus memakai
+  // SELURUH baris periode ini, jadi datanya memang perlu lengkap di sini.
+  const [cariPending, setCariPending] = useState("");
+  const pending = usePaginasiLokal(pg?.pending ?? [], {
+    cari: cariPending,
+    cocok: (p, kata) =>
+      [p.reference, p.km_ref, p.donor, p.category_label]
+        .some((v) => (v ?? "").toLowerCase().includes(kata)),
+  });
+  const [cariSettle, setCariSettle] = useState("");
+  const settle = usePaginasiLokal(settlements, {
+    cari: cariSettle,
+    cocok: (s, kata) =>
+      [s.ref, s.bank_label].some((v) => (v ?? "").toLowerCase().includes(kata)),
+  });
+
   return (
     <div className="px-5 py-5 sm:px-6">
       <InfoAlert>
@@ -319,17 +337,17 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-lg border px-3.5 py-3" style={{ background: "#FFF8F0", borderColor: "#FFCC80" }}>
           <p className="text-[10px] font-semibold uppercase" style={{ color: "#BF360C" }}>Total Donasi Masuk (Gross)</p>
-          <p className="mt-1 font-mono text-[20px] font-bold tabular-nums" style={{ color: "#E65100" }}>{fmtRp(pg?.gross.total)}</p>
+          <p className="mt-1 text-[20px] font-bold tabular-nums" style={{ color: "#E65100" }}>{fmtRp(pg?.gross.total)}</p>
           <p className="mt-0.5 text-[10px]" style={{ color: "#BF360C" }}>{pg?.gross.count ?? 0} transaksi</p>
         </div>
         <div className="rounded-lg border px-3.5 py-3" style={{ background: "#FCEBEB", borderColor: "#F4A9A8" }}>
           <p className="text-[10px] font-semibold uppercase" style={{ color: "#A32D2D" }}>Komisi KM Dipotong</p>
-          <p className="mt-1 font-mono text-[20px] font-bold tabular-nums" style={{ color: "#A32D2D" }}>{fmtRp(pg?.komisi.total)}</p>
+          <p className="mt-1 text-[20px] font-bold tabular-nums" style={{ color: "#A32D2D" }}>{fmtRp(pg?.komisi.total)}</p>
           <p className="mt-0.5 text-[10px]" style={{ color: "#A32D2D" }}>{pg?.komisi.count ?? 0} batch</p>
         </div>
         <div data-testid="pg-settled-box" className="rounded-lg border px-3.5 py-3" style={{ background: "#E8F5EE", borderColor: "#A3CDB8" }}>
           <p className="text-[10px] font-semibold uppercase" style={{ color: "#1A6B4A" }}>Sudah Settle ke Bank</p>
-          <p data-testid="pg-settled-total" className="mt-1 font-mono text-[20px] font-bold tabular-nums" style={{ color: "#1A6B4A" }}>{fmtRp(pg?.settled.total)}</p>
+          <p data-testid="pg-settled-total" className="mt-1 text-[20px] font-bold tabular-nums" style={{ color: "#1A6B4A" }}>{fmtRp(pg?.settled.total)}</p>
           <p className="mt-0.5 text-[10px]" style={{ color: "#1A6B4A" }}>{pg?.settled.count ?? 0} transaksi</p>
         </div>
       </div>
@@ -344,7 +362,7 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             </p>
           </div>
           <div className="text-right">
-            <p className="font-mono text-[24px] font-bold tabular-nums text-km-amber">{fmtRp(saldo)}</p>
+            <p className="text-[24px] font-bold tabular-nums text-km-amber">{fmtRp(saldo)}</p>
             <p className="mt-0.5 text-[11px]">
               {cocok ? (
                 <span className="text-km-green">✓ Cocok dengan total Pending/Escrow</span>
@@ -362,13 +380,23 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
       </div>
 
       {/* Tabel pending */}
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[12px] font-semibold text-km-ink-soft">Rincian Donasi Pending / Escrow (belum settle)</p>
-        <span className="text-[12px] font-semibold text-km-amber">
-          {pgPendingLabel(pg)}
-        </span>
+        <div className="flex items-center gap-2">
+          <Input
+            data-testid="cari-pg-pending"
+            value={cariPending}
+            placeholder="Cari referensi, donatur…"
+            onChange={(e) => setCariPending(e.target.value)}
+            className="max-w-52"
+            aria-label="Cari donasi pending"
+          />
+          <span className="text-[12px] font-semibold text-km-amber">
+            {pgPendingLabel(pg)}
+          </span>
+        </div>
       </div>
-      <div className="max-h-[280px] overflow-y-auto rounded-lg border border-km-border">
+      <div className="rounded-lg border border-km-border">
         <table className="w-full text-[12px]">
           <thead className="bg-km-panel-soft">
             <tr>
@@ -377,14 +405,18 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             </tr>
           </thead>
           <tbody>
-            {!pg || pg.pending.length === 0 ? (
+            {!pg || pending.rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-6 text-center text-km-ink-muted">
-                  {pg ? "Semua donasi KM sudah settle ke bank ✓" : "Memuat…"}
+                  {!pg
+                    ? "Memuat…"
+                    : cariPending
+                      ? "Data tidak ditemukan"
+                      : "Semua donasi KM sudah settle ke bank ✓"}
                 </td>
               </tr>
             ) : (
-              pg.pending.map((p) => {
+              pending.rows.map((p) => {
                 const escrow = isEscrow(p);
                 return (
                   <tr key={p.id} data-testid="pg-pending-row" className="border-t border-km-border hover:bg-km-panel-soft">
@@ -400,7 +432,7 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
                     </Td>
                     <Td>{p.donor}</Td>
                     <Td>{p.category_label}</Td>
-                    <Td className="whitespace-nowrap text-right font-mono font-semibold tabular-nums">{fmtRp(p.amount)}</Td>
+                    <Td className="whitespace-nowrap text-right font-semibold tabular-nums">{fmtRp(p.amount)}</Td>
                     <Td>
                       <span
                         className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
@@ -419,16 +451,29 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             )}
           </tbody>
         </table>
+        <div className="border-t border-km-border">
+          <Pagination {...pending.props} />
+        </div>
       </div>
 
       {/* Riwayat settlement KM → Bank Donasi (Phase 7) */}
-      <div className="mb-2 mt-5 flex items-center justify-between">
+      <div className="mb-2 mt-5 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[12px] font-semibold text-km-ink-soft">Riwayat Settlement KalyanaMitta</p>
-        {settlements.length > 0 && (
-          <span className="text-[12px] font-semibold text-km-green">{settlements.length} settlement</span>
-        )}
+        <div className="flex items-center gap-2">
+          <Input
+            data-testid="cari-pg-settlement"
+            value={cariSettle}
+            placeholder="Cari ref, bank…"
+            onChange={(e) => setCariSettle(e.target.value)}
+            className="max-w-52"
+            aria-label="Cari settlement"
+          />
+          {settlements.length > 0 && (
+            <span className="text-[12px] font-semibold text-km-green">{settlements.length} settlement</span>
+          )}
+        </div>
       </div>
-      <div className="max-h-[280px] overflow-y-auto rounded-lg border border-km-border">
+      <div className="rounded-lg border border-km-border">
         <table className="w-full text-[12px]">
           <thead className="bg-km-panel-soft">
             <tr>
@@ -438,21 +483,21 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             </tr>
           </thead>
           <tbody>
-            {settlements.length === 0 ? (
+            {settle.rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-km-ink-muted">
-                  {pg ? "Belum ada settlement" : "Memuat…"}
+                  {!pg ? "Memuat…" : cariSettle ? "Data tidak ditemukan" : "Belum ada settlement"}
                 </td>
               </tr>
             ) : (
-              settlements.map((s) => (
+              settle.rows.map((s) => (
                 <tr key={s.id} data-testid="pg-settlement-row" className="border-t border-km-border hover:bg-km-panel-soft">
                   <Td className="whitespace-nowrap">{fmtTgl(s.date)}</Td>
                   <Td className="whitespace-nowrap font-mono text-[10px]">{s.ref}</Td>
                   <Td className="whitespace-nowrap">{s.donation_count} donasi</Td>
-                  <Td className="whitespace-nowrap text-right font-mono tabular-nums">{fmtRp(s.gross)}</Td>
-                  <Td className="whitespace-nowrap text-right font-mono tabular-nums text-km-red">{fmtRp(s.komisi)}</Td>
-                  <Td className="whitespace-nowrap text-right font-mono font-semibold tabular-nums text-km-green">{fmtRp(s.net)}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums">{fmtRp(s.gross)}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums text-km-red">{fmtRp(s.komisi)}</Td>
+                  <Td className="whitespace-nowrap text-right font-semibold tabular-nums text-km-green">{fmtRp(s.net)}</Td>
                   <Td>
                     <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "var(--km-bg)", color: "var(--km-ink-muted)" }}>
                       {s.bank_label}
@@ -464,6 +509,9 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             )}
           </tbody>
         </table>
+        <div className="border-t border-km-border">
+          <Pagination {...settle.props} />
+        </div>
       </div>
     </div>
   );
@@ -528,11 +576,11 @@ function BankTab({
               <div className="mt-3 flex items-start justify-between">
                 <div>
                   <p className="text-[10px] text-km-ink-muted">Saldo Buku</p>
-                  <p className="font-mono text-[16px] font-semibold tabular-nums text-km-ink">{fmtRp(buku)}</p>
+                  <p className="text-[16px] font-semibold tabular-nums text-km-ink">{fmtRp(buku)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-km-ink-muted">Rekening Koran</p>
-                  <p className="font-mono text-[16px] font-semibold tabular-nums text-km-ink">
+                  <p className="text-[16px] font-semibold tabular-nums text-km-ink">
                     {koran != null ? fmtRp(koran) : "—"}
                   </p>
                 </div>
@@ -624,7 +672,7 @@ function SuspenseTab({
                   <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: "#FCEBEB", color: "var(--km-red)" }}>
                     2310
                   </span>
-                  <span className="font-mono text-[12px] font-semibold tabular-nums text-km-ink">{fmtRp(t.amount)}</span>
+                  <span className="text-[12px] font-semibold tabular-nums text-km-ink">{fmtRp(t.amount)}</span>
                   <span className="text-[11px] text-km-ink-muted">·</span>
                   <span className="text-[11px] text-km-ink-muted">{t.bank_label ?? "—"}</span>
                 </div>

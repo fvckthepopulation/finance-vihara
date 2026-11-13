@@ -77,6 +77,37 @@ export const pettyCashSourceLabel = (e: PettyCashEntry): string | null =>
     ? `${e.source_bank_account.bank_name.replace(/^bank\s+/i, "")} ${e.source_bank_account.account_number}`
     : null);
 
+export type PettyCashPage = {
+  data: PettyCashEntry[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+};
+
+/** Versi berhalaman — dipakai tabel mutasi di layar Kas Kecil. */
+export const listPettyCashPaginated = async (
+  params: {
+    vihara_id?: number | null;
+    pic_id?: number;
+    subtype?: PettyCashSubtype;
+    q?: string;
+    page?: number;
+    per_page?: number;
+  } = {},
+): Promise<PettyCashPage> => {
+  const sp = new URLSearchParams();
+  if (params.vihara_id != null) sp.set("vihara_id", String(params.vihara_id));
+  if (params.pic_id != null) sp.set("pic_id", String(params.pic_id));
+  if (params.subtype) sp.set("subtype", params.subtype);
+  if (params.q) sp.set("q", params.q);
+  if (params.page) sp.set("page", String(params.page));
+  if (params.per_page) sp.set("per_page", String(params.per_page));
+  const res = await api<PettyCashPage>(`/api/petty-cash${sp.toString() ? `?${sp}` : ""}`);
+  return res;
+};
+
 export const listPettyCash = async (
   params: { vihara_id?: number | null; pic_id?: number; subtype?: PettyCashSubtype } = {},
 ): Promise<PettyCashEntry[]> => {

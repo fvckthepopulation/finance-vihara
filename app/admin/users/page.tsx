@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import {
   AdminRole,
   AdminUser,
@@ -8,7 +9,7 @@ import {
   createAdminUser,
   deleteAdminUser,
   listAdminRoles,
-  listAdminUsers,
+  listAdminUsersPaginated,
   updateAdminUser,
 } from "@/lib/admin";
 import { ScopeType } from "@/lib/api";
@@ -26,6 +27,15 @@ export default function AdminUsersPage() {
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [viharas, setViharas] = useState<Vihara[]>([]);
   const [entities, setEntities] = useState<MasterEntity[]>([]);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    from: null as number | null,
+    to: null as number | null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -35,7 +45,7 @@ export default function AdminUsersPage() {
   function reload() {
     setLoading(true);
     Promise.all([
-      listAdminUsers(search),
+      listAdminUsersPaginated({ q: search, page, per_page: perPage }),
       listAdminRoles(),
       // Daftar ini sudah ter-scope di API: admin yayasan hanya menerima
       // vihara & yayasannya sendiri.
@@ -43,7 +53,14 @@ export default function AdminUsersPage() {
       listEntities({ active: true }),
     ])
       .then(([u, r, v, e]) => {
-        setUsers(u);
+        setUsers(u.data);
+        setMeta({
+          current_page: u.current_page,
+          last_page: u.last_page,
+          total: u.total,
+          from: u.from,
+          to: u.to,
+        });
         setRoles(r);
         setViharas(v);
         setEntities(e);
@@ -52,7 +69,12 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(reload, [search]);
+  useEffect(reload, [search, page, perPage]);
+
+  // Kata kunci berubah → kembali ke halaman 1.
+  useEffect(() => {
+    setPage(1);
+  }, [search, perPage]);
 
   async function handleDelete(id: number, name: string) {
     if (!confirm(`Hapus user "${name}"?`)) return;
@@ -83,13 +105,15 @@ export default function AdminUsersPage() {
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-km-border bg-km-panel-soft px-4 py-2.5">
           <Input
+            data-testid="cari-user"
+            aria-label="Cari user"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari nama / email…"
             className="min-w-48 max-w-xs"
           />
           <p className="ml-auto text-[11px] text-km-ink-muted">
-            {loading ? "Memuat…" : `${users.length} user`}
+            {loading ? "Memuat…" : `${meta.total} user`}
           </p>
         </div>
 
@@ -137,6 +161,18 @@ export default function AdminUsersPage() {
             ))}
           </tbody>
         </table>
+        <div className="border-t border-km-border">
+          <Pagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+            onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={setPerPage}
+          />
+        </div>
       </Card>
 
       {showForm && (

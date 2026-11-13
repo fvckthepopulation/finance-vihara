@@ -88,7 +88,9 @@
   --color-km-purple: var(--km-purple);
   --color-km-purple-soft: var(--km-purple-soft);
 
-  /* Monospace (font-mono) — DM Mono via next/font; angka, kode akun, nomor rekening */
+  /* Monospace (font-mono) — DM Mono via next/font.
+     HANYA untuk pengenal: kode akun COA, kode dokumen (PAY-…), key permission.
+     Nominal uang dan nomor rekening memakai font utama + tabular-nums (FV-23). */
   --font-mono: var(--font-dm-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 

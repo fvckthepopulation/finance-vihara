@@ -127,7 +127,7 @@ export default function KasBankPage() {
                         <span className="block text-[11px] font-normal text-km-ink-soft">{a.vihara_name}</span>
                       ) : null}
                     </p>
-                    <p className="mt-[3px] font-mono text-[11px] text-km-ink-muted">{a.account_number}</p>
+                    <p className="mt-[3px] tabular-nums text-[11px] text-km-ink-muted">{a.account_number}</p>
                   </div>
                   <span
                     className={`rounded px-2 py-[3px] text-[10px] font-semibold ${
@@ -279,10 +279,10 @@ export default function KasBankPage() {
                               </span>
                             )}
                           </Td>
-                          <Td className="text-right font-mono tabular-nums text-km-green">
+                          <Td className="text-right tabular-nums text-km-green">
                             {masuk > 0 ? fmtRp(masuk) : "—"}
                           </Td>
-                          <Td className="text-right font-mono tabular-nums text-km-red">
+                          <Td className="text-right tabular-nums text-km-red">
                             {keluar > 0 ? fmtRp(keluar) : "—"}
                           </Td>
                         </tr>

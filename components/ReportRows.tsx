@@ -104,7 +104,7 @@ export function LapRow({
           {label}
         </span>
         <span
-          className={`whitespace-nowrap font-mono text-[12px] tabular-nums ${heavy ? "font-semibold" : ""}`}
+          className={`whitespace-nowrap text-[12px] tabular-nums ${heavy ? "font-semibold" : ""}`}
           style={{ color: value === null ? TONE_VAR.muted : valueColor(value, tone) }}
         >
           {value === null ? "—" : fmtRp(value)}
@@ -145,9 +145,7 @@ export function Row3({
   const heavy = bold || isTotal;
   const numCell = (v: number | null, pr = "pr-3") => (
     <td
-      className={`whitespace-nowrap py-1.5 ${pr} text-right font-mono text-[12px] tabular-nums ${
-        heavy ? "font-semibold" : ""
-      }`}
+      className={`whitespace-nowrap py-1.5 ${pr} text-right text-[12px] tabular-nums ${ heavy ? "font-semibold" : "" }`}
       style={{ color: v === null ? TONE_VAR.muted : valueColor(v, tone) }}
     >
       {v === null ? "—" : fmtRp(v)}

@@ -16,6 +16,7 @@ import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input } from "@/components/Field";
+import { Pagination, usePaginasiLokal } from "@/components/Pagination";
 
 // Nama role dipakai sebagai kunci di Spatie + dirujuk di kode (mis.
 // `can('roles.manage')` lewat role). Karena itu formatnya dibatasi:
@@ -35,10 +36,11 @@ export default function AdminRolesPage() {
   const [loading, setLoading] = useState(true);
   // null = tidak ada dialog; "new" = buat role baru; objek = edit role itu.
   const [editing, setEditing] = useState<AdminRole | "new" | null>(null);
+  const [cari, setCari] = useState("");
 
   function reload() {
     setLoading(true);
-    Promise.all([listAdminRoles(), getPermissionsCatalog()])
+    Promise.all([listAdminRoles(cari), getPermissionsCatalog()])
       .then(([r, p]) => {
         setRoles(r);
         setAllPermissions(p.permissions);
@@ -48,7 +50,7 @@ export default function AdminRolesPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(reload, []);
+  useEffect(reload, [cari]);
 
   async function handleDelete(r: AdminRole) {
     if (
@@ -66,6 +68,10 @@ export default function AdminRolesPage() {
       setError(e instanceof Error ? e.message : "Gagal menghapus role");
     }
   }
+
+  // Pencariannya sudah di server; pemotongan halaman di peramban karena daftar
+  // role jumlahnya tetap sedikit dan endpoint-nya mengembalikan semuanya.
+  const daftar = usePaginasiLokal(roles);
 
   return (
     <AppShell
@@ -89,10 +95,28 @@ export default function AdminRolesPage() {
         </p>
       )}
 
+      <Card className="mb-3.5">
+        <div className="px-4 py-3">
+          <Field label="Cari role">
+            <Input
+              data-testid="cari-role"
+              placeholder="Cari nama role…"
+              value={cari}
+              onChange={(e) => setCari(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Card>
+
       {loading && <p className="text-[12px] text-km-ink-muted">Memuat…</p>}
+      {!loading && roles.length === 0 && (
+        <p className="rounded-lg border border-km-border bg-km-panel px-3 py-6 text-center text-[12px] text-km-ink-muted">
+          Data tidak ditemukan
+        </p>
+      )}
 
       <div className="space-y-3.5">
-        {roles.map((r) => (
+        {daftar.rows.map((r) => (
           <Card key={r.id} data-testid={`role-card-${r.name}`}>
             <CardHeader
               title={
@@ -148,6 +172,11 @@ export default function AdminRolesPage() {
             </div>
           </Card>
         ))}
+        {!loading && roles.length > 0 && (
+          <Card>
+            <Pagination {...daftar.props} />
+          </Card>
+        )}
       </div>
 
       {editing && (

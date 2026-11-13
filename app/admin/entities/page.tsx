@@ -44,7 +44,7 @@ export default function EntitiesPage() {
   useEffect(load, [page]);
 
   async function handleDelete(e: MasterEntity) {
-    if (!confirm(`Hapus entitas ${e.code}?`)) return;
+    if (!confirm(`Hapus yayasan ${e.code}?`)) return;
     try {
       await deleteEntity(e.id);
       load();
@@ -55,12 +55,12 @@ export default function EntitiesPage() {
 
   return (
     <AppShell
-      title="Master Entitas"
-      subtitle={`F1.2 — Manage ${pageMeta.total} entitas legal (PGS/GMP/DS/GFS dan custom)`}
+      title="Master Yayasan"
+      subtitle={`${pageMeta.total} yayasan terdaftar`}
       actions={canManage ? (
         <div className="flex items-center gap-2">
           <ImportExcelButton type="entities" onImported={load} />
-          <Button variant="primary" onClick={() => setForm("new")}>+ Entitas baru</Button>
+          <Button variant="primary" onClick={() => setForm("new")}>+ Yayasan baru</Button>
         </div>
       ) : null}
     >
@@ -165,7 +165,7 @@ function EntityForm({ item, onClose, onSaved }: { item: MasterEntity | null; onC
 
   return (
     <Modal
-      title={isEdit ? `Edit ${item!.code}` : "Entitas baru"}
+      title={isEdit ? `Edit ${item!.code}` : "Yayasan baru"}
       onClose={onClose}
       onSubmit={handleSubmit}
       width="max-w-md"

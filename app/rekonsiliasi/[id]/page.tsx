@@ -49,9 +49,7 @@ function confidenceLabel(c: string | number): string {
 function AmountText({ direction, amount }: { direction: "masuk" | "keluar"; amount: string | number }) {
   return (
     <span
-      className={`flex-shrink-0 font-mono text-[12px] font-semibold tabular-nums ${
-        direction === "masuk" ? "text-km-green" : "text-km-red"
-      }`}
+      className={`flex-shrink-0 text-[12px] font-semibold tabular-nums ${ direction === "masuk" ? "text-km-green" : "text-km-red" }`}
     >
       {fmtRp(amount)}
     </span>
@@ -271,7 +269,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "g
   return (
     <Card className="px-3.5 py-2.5">
       <p className="text-[10px] uppercase tracking-wider text-km-ink-muted">{label}</p>
-      <p className={`mt-0.5 font-mono text-[16px] font-semibold tabular-nums ${tone === "green" ? "text-km-green" : "text-km-red"}`}>
+      <p className={`mt-0.5 text-[16px] font-semibold tabular-nums ${tone === "green" ? "text-km-green" : "text-km-red"}`}>
         {value}
       </p>
     </Card>

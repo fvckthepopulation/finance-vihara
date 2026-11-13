@@ -121,8 +121,12 @@ test.describe("v39 persetujuan", () => {
     await expect(page.locator('a[href="/persetujuan"]').first()).toBeVisible();
     await page.goto("/persetujuan");
 
+    // Antreannya dipotong per halaman (FV-26), jadi barisnya dicari lewat
+    // kolom pencarian — bukan diandaikan muncul di halaman pertama.
+    await page.getByTestId("filter-cari").fill(BUKTI);
+
     const baris = page.locator("tbody tr").filter({ hasText: BUKTI }).first();
-    await expect(baris).toBeVisible({ timeout: 10_000 });
+    await expect(baris).toBeVisible({ timeout: 15_000 });
 
     const setujui = baris.locator('[data-testid^="setujui-"]');
     await expect(setujui).toBeVisible();

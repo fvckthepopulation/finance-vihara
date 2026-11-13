@@ -110,6 +110,12 @@ export const getJournalEntry = (id: number | string) =>
 
 export type CreateJournalEntryPayload = {
   entity_id: number;
+  /**
+   * Vihara pemilik jurnal (FV-35). Wajib diisi dari form; null hanya untuk
+   * jurnal tingkat yayasan yang dibuat sistem, dan untuk baris lama yang
+   * memang belum punya vihara.
+   */
+  vihara_id?: number | null;
   entry_date: string;
   description: string;
   reference?: string;

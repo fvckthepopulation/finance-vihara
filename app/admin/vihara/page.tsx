@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input, Select, Textarea } from "@/components/Field";
+import { Pagination, usePaginasiLokal } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
 import {
   createViharaBankAccount,
@@ -77,6 +78,10 @@ export default function AdminViharaPage() {
     }
   }
 
+  // Pencarian sudah di server (`q`); halaman dipotong di peramban karena
+  // daftar vihara jumlahnya tetap kecil.
+  const daftar = usePaginasiLokal(rows);
+
   return (
     <AppShell
       title="Admin — Vihara"
@@ -122,9 +127,13 @@ export default function AdminViharaPage() {
           </thead>
           <tbody>
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-km-ink-muted">Belum ada vihara.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-3 py-8 text-center text-km-ink-muted">
+                  {search ? "Data tidak ditemukan" : "Belum ada vihara."}
+                </td>
+              </tr>
             )}
-            {rows.map((v) => (
+            {daftar.rows.map((v) => (
               <ViharaRow
                 key={v.id}
                 v={v}
@@ -140,6 +149,9 @@ export default function AdminViharaPage() {
             ))}
           </tbody>
         </table>
+        <div className="border-t border-km-border">
+          <Pagination {...daftar.props} />
+        </div>
       </Card>
 
       {form && (
@@ -338,7 +350,7 @@ function BankAccountSection({
                     </span>
                   )}
                 </p>
-                <p className="font-mono text-[11px] text-km-ink-muted">{b.account_number}</p>
+                <p className="tabular-nums text-[11px] text-km-ink-muted">{b.account_number}</p>
                 <p className="text-[10px] text-km-ink-muted">a.n. {b.account_name}</p>
               </div>
               {canManage && (

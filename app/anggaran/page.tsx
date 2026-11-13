@@ -283,14 +283,14 @@ export default function AnggaranPage() {
                               aria-label={`Target ${r.label}`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums">{fmtRp(target)}</span>
+                            <span className="tabular-nums">{fmtRp(target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right font-mono tabular-nums font-medium text-km-green">
+                        <Td className="text-right tabular-nums font-medium text-km-green">
                           {fmtRp(real)}
                         </Td>
                         <Td
-                          className={`text-right font-mono tabular-nums ${
+                          className={`text-right tabular-nums ${
                             sisa >= 0 ? "text-km-ink-soft" : "text-km-red"
                           }`}
                         >
@@ -350,14 +350,14 @@ export default function AnggaranPage() {
                               aria-label={`Anggaran ${r.label}`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums">{fmtRp(target)}</span>
+                            <span className="tabular-nums">{fmtRp(target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right font-mono tabular-nums font-medium text-km-red">
+                        <Td className="text-right tabular-nums font-medium text-km-red">
                           {fmtRp(real)}
                         </Td>
                         <Td
-                          className={`text-right font-mono tabular-nums ${
+                          className={`text-right tabular-nums ${
                             sisa >= 0 ? "text-km-ink-soft" : "text-km-red"
                           }`}
                         >
@@ -443,14 +443,14 @@ export default function AnggaranPage() {
                               aria-label={`Anggaran ${r.name}`}
                             />
                           ) : (
-                            <span className="font-mono tabular-nums">{fmtRp(r.target)}</span>
+                            <span className="tabular-nums">{fmtRp(r.target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right font-mono tabular-nums text-km-red">
+                        <Td className="text-right tabular-nums text-km-red">
                           {r.realisasi ? fmtRp(r.realisasi) : "-"}
                         </Td>
                         <Td
-                          className={`text-right font-mono tabular-nums ${
+                          className={`text-right tabular-nums ${
                             pct > 100 ? "text-km-red" : pct > 80 ? "text-km-amber-ink" : "text-km-ink-muted"
                           }`}
                         >

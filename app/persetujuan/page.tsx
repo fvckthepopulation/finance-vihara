@@ -7,11 +7,12 @@ import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag } from "@/components/DanaTag";
 import { Field, Input, Select } from "@/components/Field";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
 import { postPembayaran, rejectPembayaran, STATUS_LABEL, STATUS_TONE, PembayaranStatus } from "@/lib/pembayaran";
 import { postPenerimaan, rejectPenerimaan } from "@/lib/penerimaan";
 import {
-  listTransactions,
+  listApprovals,
   TransactionRow,
   TransactionStatus,
   TransactionTipe,
@@ -60,6 +61,9 @@ export default function PersetujuanPage() {
 
   const [f, setF] = useState({ ...KOSONG });
   const [rows, setRows] = useState<TransactionRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
   const [viharas, setViharas] = useState<ScopeVihara[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +79,7 @@ export default function PersetujuanPage() {
   const reload = useCallback(() => {
     setLoading(true);
     setError(null);
-    listTransactions({
+    listApprovals({
       status: f.status,
       tipe: f.tipe || undefined,
       category: f.category || undefined,
@@ -84,14 +88,23 @@ export default function PersetujuanPage() {
       vihara_id: f.vihara ? Number(f.vihara) : null,
       submitted_by: f.pengaju ? Number(f.pengaju) : null,
       search: f.cari || undefined,
-      per_page: 100,
+      page,
+      per_page: perPage,
     })
-      .then((r) => setRows(r.data))
+      .then((r) => {
+        setRows(r.data);
+        setMeta({ current_page: r.current_page, last_page: r.last_page, total: r.total, from: r.from, to: r.to });
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"))
       .finally(() => setLoading(false));
-  }, [f]);
+  }, [f, page, perPage]);
 
   useEffect(reload, [reload]);
+
+  // Saringan berubah → kembali ke halaman 1.
+  useEffect(() => {
+    setPage(1);
+  }, [f, perPage]);
 
   // Daftar pengaju dirakit dari isi antrean — tidak perlu endpoint sendiri,
   // dan isinya otomatis terbatas pada yang memang terlihat oleh pengguna.
@@ -265,7 +278,7 @@ export default function PersetujuanPage() {
       <Card>
         <CardHeader
           title="Antrean persetujuan"
-          subtitle={loading ? "Memuat…" : `${rows.length} transaksi`}
+          subtitle={loading ? "Memuat…" : undefined}
         />
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -293,7 +306,7 @@ export default function PersetujuanPage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-3 py-10 text-center text-km-ink-muted">
-                    Tidak ada data
+                    {f.cari ? "Data tidak ditemukan" : "Tidak ada pengajuan"}
                   </td>
                 </tr>
               ) : (
@@ -333,7 +346,7 @@ export default function PersetujuanPage() {
                       <DanaTag category={r.category} label={r.category_label} />
                     </Td>
                     <Td className="whitespace-nowrap text-[11px]">{r.submitted_by ?? "—"}</Td>
-                    <Td className="text-right font-mono tabular-nums font-medium">
+                    <Td className="text-right tabular-nums font-medium">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
@@ -374,6 +387,18 @@ export default function PersetujuanPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-km-border">
+          <Pagination
+            currentPage={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+            onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={setPerPage}
+          />
         </div>
       </Card>
     </AppShell>

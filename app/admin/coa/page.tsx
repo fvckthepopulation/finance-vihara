@@ -19,7 +19,7 @@ import { ImportExcelButton } from "@/components/ImportExcelButton";
 import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input, Select, Textarea } from "@/components/Field";
-import { Pagination } from "@/components/Pagination";
+import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 
 const TYPE_TONE: Record<AccountType, "info" | "warn" | "purple" | "success" | "danger"> = {
   asset: "info",
@@ -43,6 +43,7 @@ export default function CoaPage() {
   const [showInactive, setShowInactive] = useState(false);
 
   const [showForm, setShowForm] = useState<"new" | { account: CoaAccount } | null>(null);
+  const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
 
   function load() {
     setLoading(true);
@@ -52,7 +53,7 @@ export default function CoaPage() {
       type: typeFilter || undefined,
       active: showInactive ? undefined : true,
       page,
-      per_page: 25,
+      per_page: perPage,
     })
       .then((res) => {
         setRows(res.data);
@@ -62,8 +63,8 @@ export default function CoaPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [search, typeFilter, showInactive, page]);
-  useEffect(() => setPage(1), [search, typeFilter, showInactive]);
+  useEffect(load, [search, typeFilter, showInactive, page, perPage]);
+  useEffect(() => setPage(1), [search, typeFilter, showInactive, perPage]);
 
   async function handleDelete(account: CoaAccount) {
     if (!confirm(`Hapus akun ${account.code} ${account.name}?\nIni akan gagal kalau akun sudah dipakai di jurnal.`)) {
@@ -142,6 +143,8 @@ export default function CoaPage() {
             from={pageMeta.from}
             to={pageMeta.to}
             onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={setPerPage}
           />
         </div>
 
@@ -323,9 +326,9 @@ function CoaForm({
             <Input required value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
 
-          <Field label="Entitas pemilik (opsional — wajib untuk rekening bank biar bisa diketahui beban entity)">
+          <Field label="Yayasan pemilik (opsional — wajib untuk rekening bank agar bebannya bisa ditelusuri)">
             <Select value={entityId ?? ""} onChange={(e) => setEntityId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">— Umum / tidak terikat entitas —</option>
+              <option value="">— Umum / tidak terikat yayasan —</option>
               {entities.map((e) => (
                 <option key={e.id} value={e.id}>{e.code} — {e.legal_name}</option>
               ))}

@@ -85,6 +85,17 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
+        href: "/pengeluaran",
+        label: "Daftar Pengeluaran",
+        permission: "pembayaran.view",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M3 3h10v10H3z" />
+            <path d="M5.5 6.5h5M5.5 9.5h3" />
+          </svg>
+        ),
+      },
+      {
         href: "/pembayaran",
         label: "Input Pengeluaran",
         permission: "pembayaran.view",
@@ -110,7 +121,10 @@ const SECTIONS: NavSection[] = [
       {
         href: "/riwayat",
         label: "Semua Transaksi",
-        permission: "cash.view",
+        // Dulu menu ini menumpang izin "cash.view" — izin menu Kas & Bank,
+        // yang tidak ada hubungannya. Kini punya izin sendiri sehingga bisa
+        // diberikan atau dicabut per role di Admin -> Roles.
+        permission: "transaksi.view",
         icon: (
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
             <circle cx="8" cy="8" r="6" />
@@ -192,7 +206,7 @@ const SECTIONS: NavSection[] = [
       {
         href: "/konsolidasi",
         label: "Konsolidasi Yayasan",
-        permission: "reports.pl.view",
+        permission: "konsolidasi.view",
         yayasanOnly: true,
         hideInSingleEntity: true,
         icon: (
@@ -230,6 +244,41 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
+        href: "/admin/pengeluaran",
+        label: "Master Pengeluaran",
+        permission: "masters.view",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M3 2h7l3 3v9H3z" />
+            <path d="M5.5 7.5h5M5.5 10h3" />
+          </svg>
+        ),
+      },
+      {
+        href: "/admin/penerima",
+        label: "Master Penerima",
+        permission: "masters.view",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="8" cy="5.5" r="2.5" />
+            <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" />
+          </svg>
+        ),
+      },
+      {
+        href: "/admin/rekening",
+        label: "Master Rekening",
+        // Pemegang master boleh melihat katalognya; pengelola rekening
+        // (cash.account.manage) memang pemiliknya (FV-30).
+        permission: ["masters.view", "cash.account.manage"],
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="2" y="4" width="12" height="8" rx="1.5" />
+            <path d="M2 7h12M4.5 10h3" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/vihara",
         label: "Vihara",
         permission: "masters.view",
@@ -262,7 +311,9 @@ const SECTIONS: NavSection[] = [
       },
       {
         href: "/admin/entities",
-        label: "Entities",
+        // Istilah "Entitas"/"Entities" tidak dipakai pengguna; di seluruh
+        // aplikasi tingkat ini disebut Yayasan (FV-34).
+        label: "Yayasan",
         permission: "masters.view",
         icon: (
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
