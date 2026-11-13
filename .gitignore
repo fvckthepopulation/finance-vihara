@@ -53,3 +53,6 @@ AGENTS.md
 .cursor/
 .windsurf/
 
+
+# Laporan QC — berkas kerja, bukan bagian aplikasi. Jangan ikut ke server.
+laporan/
