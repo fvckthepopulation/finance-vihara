@@ -16,6 +16,12 @@ export const USERS = {
   bendaharaMulti: { email: "bendahara.multi@ydi.test", password: "password" }, // scope vihara [VVG, VAD]
   approver: { email: "approver@vvg.test", password: "password" },         // approver VVG
   viewer: { email: "viewer@vvg.test", password: "password" },             // viewer VVG (read-only)
+
+  // Lima role matriks penguji (Test scenario Finance Vihara v2.1).
+  adminTeratas: { email: "admin.teratas@ydi.test", password: "password" },       // global, tanpa roles/entities/coa.manage
+  adminKonsolidasi: { email: "admin.konsolidasi@ydi.test", password: "password" }, // global, baca + rekonsiliasi saja
+  adminVihara: { email: "admin.vihara@vvg.test", password: "password" },         // scope vihara [VVG]
+  ujiNonaktif: { email: "uji.nonaktif@vvg.test", password: "password" },         // akun nonaktif (C-ADM-05)
 } as const;
 
 export type UserKey = keyof typeof USERS;

@@ -25,20 +25,27 @@ test.describe("v44 permission konsolidasi", () => {
     expect(body.hidden ?? []).not.toContain("konsolidasi.view");
   });
 
-  test("FV-32: role tingkat yayasan dapat izinnya, bendahara tidak", async () => {
-    for (const u of ["admin", "adminYayasan", "pengawas"] as const) {
+  test("FV-32: pemegang konsolidasi.view bisa, yang lain tidak", async () => {
+    for (const u of ["admin", "pengawas"] as const) {
       const token = await apiToken(u);
       expect(
         (await apiCall(token, `/api/laporan/konsolidasi${PERIODE}`)).status,
         `${u} boleh membuka konsolidasi`,
       ).toBe(200);
     }
+    // admin_yayasan berjangkauan yayasan, tapi matriks penguji menulis
+    // Konsolidasi "Tidak tampil" untuknya — izinnya memang tidak diberikan.
+    const yayasan = await apiToken("adminYayasan");
+    expect((await apiCall(yayasan, `/api/laporan/konsolidasi${PERIODE}`)).status).toBe(403);
+
     const bendahara = await apiToken("bendahara");
     expect((await apiCall(bendahara, `/api/laporan/konsolidasi${PERIODE}`)).status).toBe(403);
   });
 
   test("FV-32: menu hanya muncul untuk pemegang izin", async ({ page }) => {
-    await login(page, "adminYayasan");
+    // pengawas_yayasan memegang konsolidasi.view; admin_yayasan tidak
+    // (matriks penguji menulisnya "Tidak tampil").
+    await login(page, "pengawas");
     await expect(page.getByRole("link", { name: "Konsolidasi Yayasan" }).first()).toBeVisible({
       timeout: 10_000,
     });
@@ -46,7 +53,7 @@ test.describe("v44 permission konsolidasi", () => {
     await page.getByRole("button", { name: "Keluar" }).click();
     await page.waitForURL("**/login");
 
-    await login(page, "bendahara");
+    await login(page, "adminYayasan");
     await expect(page.locator('a[href="/konsolidasi"]')).toHaveCount(0);
   });
 
@@ -89,7 +96,7 @@ test.describe("v44 permission konsolidasi", () => {
       `/api/laporan/konsolidasi${PERIODE}`,
     );
     const yayasan = await apiCall<{ per_vihara: Entry[] }>(
-      await apiToken("adminYayasan"),
+      await apiToken("pengawas"),
       `/api/laporan/konsolidasi${PERIODE}`,
     );
 
@@ -97,7 +104,7 @@ test.describe("v44 permission konsolidasi", () => {
     const kodeYayasan = yayasan.body.per_vihara.map((e) => e.vihara?.code).filter(Boolean);
     expect(kodeAdmin.length).toBeGreaterThan(0);
     expect(kodeYayasan.length).toBeGreaterThan(0);
-    // Admin yayasan YDI tidak boleh melihat vihara di luar yayasannya.
+    // Pemegang akses yayasan YDI tidak boleh melihat vihara di luar yayasannya.
     expect(kodeYayasan.length).toBeLessThanOrEqual(kodeAdmin.length);
     for (const k of kodeYayasan) expect(kodeAdmin).toContain(k);
   });

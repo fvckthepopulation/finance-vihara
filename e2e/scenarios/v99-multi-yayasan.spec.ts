@@ -79,7 +79,11 @@ test.describe("v99 multi-yayasan", () => {
         name: `Admin Yayasan ${stamp}`,
         email: EMAIL_ADMIN_BARU,
         password: PASSWORD_BARU,
-        role: "admin_yayasan",
+        // Membaca daftar vihara/yayasan butuh masters.view & entities.view;
+        // sejak matriks penguji dipakai, izin itu ada di admin_teratas.
+        // Jangkauannya tetap dibatasi scope_type=entity di bawah ini — dan
+        // itu justru yang diuji: izin luas, jangkauan tetap sempit.
+        role: "admin_teratas",
         entity_id: yayasanBaruId,
         scope_type: "entity",
       }),
@@ -94,10 +98,22 @@ test.describe("v99 multi-yayasan", () => {
     const me = await apiMe(token);
     expect(me.scope_type).toBe("entity");
     expect(me.entity_id).toBe(yayasanBaruId);
-    expect(me.vihara_ids).toEqual([viharaBaruId]);
-
-    const viharas = await apiCall<Daftar<{ id: number }>>(token, "/api/viharas");
-    expect(viharas.body.data.map((v) => v.id)).toEqual([viharaBaruId]);
+    // Jangkauan yayasan mencakup viharanya DAN unit Umum/Pusat yayasan itu
+    // (P-01) — tidak ada vihara yayasan lain.
+    const viharas = await apiCall<Daftar<{ id: number; is_umum?: boolean }>>(
+      token,
+      "/api/viharas",
+    );
+    const terlihat = viharas.body.data;
+    expect(terlihat.map((v) => v.id)).toContain(viharaBaruId);
+    for (const v of terlihat) {
+      if (v.id !== viharaBaruId) {
+        expect(v.is_umum, "satu-satunya unit tambahan adalah Umum/Pusat").toBe(true);
+      }
+    }
+    expect((me.vihara_ids ?? []).slice().sort()).toEqual(
+      terlihat.map((v) => v.id).sort(),
+    );
 
     const entities = await apiCall<Daftar<{ id: number }>>(token, "/api/entities");
     expect(entities.body.data.map((e) => e.id)).toEqual([yayasanBaruId]);
@@ -142,7 +158,16 @@ test.describe("v99 multi-yayasan", () => {
     const idVihara = konsol.body.per_vihara
       .map((v) => v.vihara?.id)
       .filter((id): id is number => typeof id === "number");
-    expect(idVihara).toEqual([viharaBaruId]);
+    // Viharanya sendiri plus unit Umum/Pusat yayasan itu (P-01) — tidak ada
+    // vihara yayasan lain.
+    expect(idVihara).toContain(viharaBaruId);
+    const viharaYdi = await apiCall<Daftar<{ id: number }>>(adminToken, "/api/viharas?per_page=100");
+    const idYdi = viharaYdi.body.data
+      .filter((v) => (v as { entity_id?: number }).entity_id !== yayasanBaruId)
+      .map((v) => v.id);
+    for (const id of idVihara) {
+      expect(idYdi, "konsolidasi tidak boleh memuat vihara yayasan lain").not.toContain(id);
+    }
   });
 
   test("admin yayasan tidak punya jalan menaikkan haknya sendiri", async () => {

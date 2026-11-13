@@ -13,11 +13,16 @@ test.describe("v02 vihara selector", () => {
     const select = page.getByLabel("Pilih vihara");
     await expect(select).toBeVisible();
 
-    // Opsi vihara dimuat async — tunggu sampai lengkap (Semua Vihara + 3 vihara).
-    await expect(select.locator("option")).toHaveCount(4, { timeout: 10_000 });
+    // Opsi vihara dimuat async — tunggu sampai lengkap: "Semua Vihara", tiga
+    // vihara, dan unit Umum/Pusat yayasan yang dibuat otomatis (P-01).
+    await expect(select.locator("option")).toHaveCount(5, { timeout: 10_000 });
     const labels = await select.locator("option").allTextContents();
     expect(labels[0]).toContain("Semua Vihara");
     expect(labels.some((l) => l.includes("Vipassan"))).toBeTruthy();
+    expect(
+      labels.some((l) => l.includes("Umum/Pusat")),
+      "unit Umum yayasan ikut bisa dipilih pemegang akses tingkat yayasan",
+    ).toBeTruthy();
 
     await pickViharaVVG(page);
     const chosen = await select.inputValue();

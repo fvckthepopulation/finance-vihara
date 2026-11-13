@@ -154,12 +154,19 @@ test.describe("v32 hirarki akses", () => {
     expect((await apiCall(token, `/api/penerimaan?vihara_id=${codes.VBM}`)).status).toBe(403);
   });
 
-  test("konsolidasi yayasan tertutup bagi pemegang scope vihara", async () => {
+  test("konsolidasi yayasan: butuh izin DAN jangkauan tingkat yayasan", async () => {
+    // Jangkauan vihara: ditolak apa pun izinnya.
     expect((await apiCall(await apiToken("bendahara"), "/api/laporan/konsolidasi")).status).toBe(403);
     expect((await apiCall(await apiToken("bendaharaMulti"), "/api/laporan/konsolidasi")).status).toBe(403);
+
+    // Jangkauan yayasan DAN memegang konsolidasi.view.
     expect((await apiCall(await apiToken("pengawas"), "/api/laporan/konsolidasi")).status).toBe(200);
-    expect((await apiCall(await apiToken("adminYayasan"), "/api/laporan/konsolidasi")).status).toBe(200);
     expect((await apiCall(await apiToken("admin"), "/api/laporan/konsolidasi")).status).toBe(200);
+
+    // admin_yayasan berjangkauan yayasan, tapi menurut matriks penguji
+    // Konsolidasi "Tidak tampil" untuknya — jadi izinnya memang tidak
+    // diberikan, dan API pun menolak.
+    expect((await apiCall(await apiToken("adminYayasan"), "/api/laporan/konsolidasi")).status).toBe(403);
   });
 
   test("daftar vihara ikut hirarki, bukan daftar penuh", async () => {
@@ -175,19 +182,26 @@ test.describe("v32 hirarki akses", () => {
   });
 
   test("role memisahkan APA yang boleh dari DI MANA boleh", async () => {
-    // pengawas & adminYayasan sama-sama scope entity, tapi beda hak:
-    // pengawas read-only, adminYayasan boleh kelola pengguna.
+    // pengawas & adminYayasan sama-sama berjangkauan yayasan, tapi beda hak:
+    // pengawas membaca saja, adminYayasan boleh mencatat transaksi.
     const pengawas = await apiToken("pengawas");
     const yayasan = await apiToken("adminYayasan");
 
+    const draft = {
+      method: "POST",
+      body: JSON.stringify({ status: "draft", date: new Date().toLocaleDateString("en-CA") }),
+    };
+    expect((await apiCall(pengawas, "/api/penerimaan", draft)).status).toBe(403);
+    expect((await apiCall(yayasan, "/api/penerimaan", draft)).status).not.toBe(403);
+
+    // Keduanya tetap boleh membaca daftar penerimaan seluruh yayasannya.
+    expect((await apiCall(pengawas, "/api/penerimaan")).status).toBe(200);
+    expect((await apiCall(yayasan, "/api/penerimaan")).status).toBe(200);
+
+    // Kelola pengguna dan definisi role sama-sama di luar jangkauan keduanya:
+    // matriks penguji menempatkannya di Admin Teratas ke atas.
     expect((await apiCall(pengawas, "/api/admin/users")).status).toBe(403);
-    expect((await apiCall(yayasan, "/api/admin/users")).status).toBe(200);
-
-    // Keduanya tetap boleh membaca laporan seluruh yayasan.
-    expect((await apiCall(pengawas, "/api/laporan/konsolidasi")).status).toBe(200);
-    expect((await apiCall(yayasan, "/api/laporan/konsolidasi")).status).toBe(200);
-
-    // Definisi role tetap hak admin tertinggi saja.
+    expect((await apiCall(yayasan, "/api/admin/users")).status).toBe(403);
     const buatRole = { method: "POST", body: JSON.stringify({ name: "role_uji_e2e" }) };
     expect((await apiCall(yayasan, "/api/admin/roles", buatRole)).status).toBe(403);
   });
@@ -277,7 +291,9 @@ test.describe("v32 hirarki akses", () => {
   // -------------------------------------------------------------------
 
   test("halaman admin menampilkan jangkauan akses tiap pengguna", async ({ page }) => {
-    await login(page, "adminYayasan");
+    // Kelola pengguna kini di Admin Teratas ke atas (matriks penguji), jadi
+    // layar ini dibuka oleh pemegang izin itu.
+    await login(page, "admin");
     await page.goto("/admin/users");
 
     const baris = (email: string) => page.getByTestId(`user-row-${email}`);
@@ -312,7 +328,8 @@ test.describe("v32 hirarki akses", () => {
   });
 
   test("scope vihara wajib menunjuk minimal satu vihara", async () => {
-    const token = await apiToken("adminYayasan");
+    // Kelola pengguna kini milik Admin Teratas ke atas (matriks penguji).
+    const token = await apiToken("admin");
     const res = await apiCall(token, "/api/admin/users", {
       method: "POST",
       body: JSON.stringify({

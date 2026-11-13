@@ -9,7 +9,7 @@ import { Field, Input, Select, Textarea } from "@/components/Field";
 import { Modal } from "@/components/Modal";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
-import { getMyScope, ScopeVihara } from "@/lib/api";
+import { getMyScope, ScopeEntity, ScopeVihara } from "@/lib/api";
 import { CoaAccount, listCoa } from "@/lib/coa";
 import {
   createViharaBankAccount,
@@ -46,6 +46,7 @@ export default function MasterRekeningPage_() {
   const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const [res, setRes] = useState<MasterRekeningPage | null>(null);
   const [viharas, setViharas] = useState<ScopeVihara[]>([]);
+  const [entities, setEntities] = useState<ScopeEntity[]>([]);
   const [akun, setAkun] = useState<CoaAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,8 +55,14 @@ export default function MasterRekeningPage_() {
 
   useEffect(() => {
     getMyScope()
-      .then((d) => setViharas(d.viharas))
-      .catch(() => setViharas([]));
+      .then((d) => {
+        setViharas(d.viharas);
+        setEntities(d.entities);
+      })
+      .catch(() => {
+        setViharas([]);
+        setEntities([]);
+      });
     // Hanya akun kas/bank (1xxx aset) yang masuk akal sebagai akun rekening.
     listCoa({ type: "asset", active: true })
       .then((list) => setAkun(list.filter((a) => !a.is_header && /^11/.test(a.code))))
@@ -184,7 +191,8 @@ export default function MasterRekeningPage_() {
           <table className="w-full text-[12px]">
             <thead className="bg-km-bg">
               <tr>
-                <Th>Vihara</Th>
+                <Th>Yayasan</Th>
+                <Th>Vihara Pengguna</Th>
                 <Th>Jenis</Th>
                 <Th>Nama Bank / Kas</Th>
                 <Th>No. Rekening</Th>
@@ -197,13 +205,13 @@ export default function MasterRekeningPage_() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-10 text-center text-km-ink-muted">
                     Memuat…
                   </td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-km-ink-muted">
+                  <td colSpan={9} className="px-3 py-10 text-center text-km-ink-muted">
                     {f.cari || f.jenis || f.status || f.vihara
                       ? "Data tidak ditemukan"
                       : "Belum ada rekening"}
@@ -216,7 +224,15 @@ export default function MasterRekeningPage_() {
                     data-testid={`rekening-row-${b.id}`}
                     className="border-t border-km-border hover:bg-km-panel-soft"
                   >
-                    <Td className="whitespace-nowrap">{b.vihara_name ?? "—"}</Td>
+                    <Td className="whitespace-nowrap">{b.entity_name ?? "—"}</Td>
+                    <Td className="text-[11px]">
+                      {/* Kosong = seluruh vihara yayasan itu (FV-36). */}
+                      {b.vihara_names.length === 0 ? (
+                        <span className="text-km-ink-muted">Semua vihara</span>
+                      ) : (
+                        b.vihara_names.join(", ")
+                      )}
+                    </Td>
                     <Td>
                       <Badge tone={b.type === "bank" ? "info" : "neutral"}>{b.type_label}</Badge>
                     </Td>
@@ -297,6 +313,7 @@ export default function MasterRekeningPage_() {
         <RekeningForm
           item={form === "new" ? null : form.item}
           viharas={viharas}
+          entities={entities}
           akun={akun}
           onClose={() => setForm(null)}
           onSaved={(pesan) => {
@@ -313,19 +330,23 @@ export default function MasterRekeningPage_() {
 function RekeningForm({
   item,
   viharas,
+  entities,
   akun,
   onClose,
   onSaved,
 }: {
   item: MasterRekeningRow | null;
   viharas: ScopeVihara[];
+  entities: ScopeEntity[];
   akun: CoaAccount[];
   onClose: () => void;
   onSaved: (pesan: string) => void;
 }) {
-  const [viharaId, setViharaId] = useState<string>(
-    item ? String(item.vihara_id) : viharas.length === 1 ? String(viharas[0].id) : "",
+  const [entityId, setEntityId] = useState<string>(
+    item ? String(item.entity_id) : "",
   );
+  // Kosong = seluruh vihara yayasan boleh memakai (FV-36 poin 2).
+  const [viharaIds, setViharaIds] = useState<number[]>(item?.vihara_ids ?? []);
   const [jenis, setJenis] = useState<JenisRekening>(item?.type ?? "bank");
   const [namaBank, setNamaBank] = useState(item?.bank_name ?? "");
   const [nomor, setNomor] = useState(item?.account_number ?? "");
@@ -336,12 +357,16 @@ function RekeningForm({
   const [error, setError] = useState<string | null>(null);
 
   const bank = jenis === "bank";
+  // Vihara yang boleh dicentang hanya milik yayasan pemiliknya.
+  const viharaYayasan = viharas.filter(
+    (v) => entityId !== "" && v.entity_id === Number(entityId),
+  );
 
   async function simpan(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!item && !viharaId) {
-      setError("Pilih vihara pemilik rekening.");
+    if (!item && !entityId) {
+      setError("Pilih yayasan pemilik rekening.");
       return;
     }
     setPending(true);
@@ -353,12 +378,13 @@ function RekeningForm({
         account_name: atasNama || null,
         coa_account_code: coa,
         description: keterangan || null,
+        vihara_ids: viharaIds,
       };
       if (item) {
         await updateViharaBankAccount(item.id, payload);
         onSaved("Rekening diperbarui");
       } else {
-        await createViharaBankAccount(Number(viharaId), payload);
+        await createViharaBankAccount(Number(entityId), payload);
         onSaved("Rekening ditambahkan");
       }
     } catch (e) {
@@ -391,21 +417,58 @@ function RekeningForm({
         </p>
       )}
       <div className="grid grid-cols-1 gap-2.5">
-        <Field label="Vihara pemilik *">
+        <Field label="Yayasan pemilik *" hint="Rekening dibuka atas nama yayasan dan dipakai bersama vihara-viharanya.">
           <Select
             required
-            data-testid="rekening-vihara"
-            value={viharaId}
+            data-testid="rekening-yayasan"
+            value={entityId}
             disabled={item !== null}
-            onChange={(e) => setViharaId(e.target.value)}
+            onChange={(e) => {
+              setEntityId(e.target.value);
+              setViharaIds([]);
+            }}
           >
-            <option value="">— Pilih vihara —</option>
-            {viharas.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
+            <option value="">— Pilih yayasan —</option>
+            {entities.map((en) => (
+              <option key={en.id} value={en.id}>
+                {en.legal_name}
               </option>
             ))}
           </Select>
+        </Field>
+        <Field
+          label="Vihara pengguna"
+          hint="Kosongkan bila seluruh vihara yayasan ini boleh memakainya. Centang hanya bila rekening ini memang khusus."
+        >
+          <div
+            data-testid="rekening-vihara-pengguna"
+            className="space-y-1 rounded-lg border border-km-border px-3 py-2"
+          >
+            {viharaYayasan.length === 0 ? (
+              <p className="text-[11px] text-km-ink-muted">Pilih yayasan dulu.</p>
+            ) : (
+              viharaYayasan.map((v) => (
+                <label key={v.id} className="flex items-center gap-2 text-[12px] text-km-ink">
+                  <input
+                    type="checkbox"
+                    data-testid={`rekening-vihara-${v.id}`}
+                    checked={viharaIds.includes(v.id)}
+                    onChange={(e) =>
+                      setViharaIds((prev) =>
+                        e.target.checked ? [...prev, v.id] : prev.filter((x) => x !== v.id),
+                      )
+                    }
+                  />
+                  {v.name}
+                </label>
+              ))
+            )}
+            {viharaIds.length === 0 && viharaYayasan.length > 0 && (
+              <p className="pt-1 text-[11px] text-km-ink-muted">
+                Tidak ada yang dicentang — berlaku untuk semua vihara yayasan ini.
+              </p>
+            )}
+          </div>
         </Field>
         <Field label="Jenis *">
           <Select

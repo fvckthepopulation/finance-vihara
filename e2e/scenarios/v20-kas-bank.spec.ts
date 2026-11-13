@@ -16,7 +16,9 @@ test.describe("v20 kas & bank", () => {
 
     await expect(page.getByText("6280-3488-88").first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("1570-0122-5555-4").first()).toBeVisible();
-    await expect(page.getByText("Saldo per buku").first()).toBeVisible();
+    // Rekening milik yayasan (FV-36): pemegang akses tingkat yayasan melihat
+    // saldo utuh rekening — yang dicocokkan dengan rekening koran.
+    await expect(page.getByText("Saldo rekening (per buku)").first()).toBeVisible();
     await expect(page.getByText("AKTIF").first()).toBeVisible();
 
     // Kas Kecil card: PIC Lili & Epi.

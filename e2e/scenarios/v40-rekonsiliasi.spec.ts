@@ -13,7 +13,7 @@
  * belum completed; bila semua terkunci, fallback buat run bulan lampau via API.
  */
 import { test, expect, Page } from "@playwright/test";
-import { login, pickViharaVVG } from "../fixtures/auth";
+import { login, pickViharaVVG, viharaIdsByCode } from "../fixtures/auth";
 import { uniq, today } from "../fixtures/uniq";
 
 const API = process.env.E2E_API_URL ?? "http://localhost:8500";
@@ -41,16 +41,24 @@ function authHeaders(token: string) {
 
 type BankAccount = { id: number; vihara_id: number; account_number: string; bank_name: string };
 
-/** Semua rekening milik VVG (ditemukan via norek BCA seed 6280-3488-88). */
+/**
+ * Rekening yang boleh dipakai VVG. Sejak FV-36 rekening milik YAYASAN dan
+ * dipakai bersama, jadi penyaringnya vihara pengguna — bukan lagi kolom
+ * vihara_id di rekening itu sendiri.
+ */
 async function getVvgBanks(page: Page, token: string): Promise<BankAccount[]> {
-  const res = await page.request.get(`${API}/api/masters/vihara-bank-accounts`, {
-    headers: authHeaders(token),
-  });
+  const vvg = (await viharaIdsByCode()).VVG;
+  const res = await page.request.get(
+    `${API}/api/masters/vihara-bank-accounts?vihara_id=${vvg}`,
+    { headers: authHeaders(token) },
+  );
   expect(res.ok()).toBeTruthy();
   const body = (await res.json()) as { data: BankAccount[] };
-  const bca = body.data.find((b) => b.account_number === "6280-3488-88");
-  if (!bca) throw new Error("Rekening BCA VVG (6280-3488-88) tidak ditemukan");
-  return body.data.filter((b) => b.vihara_id === bca.vihara_id);
+  if (!body.data.some((b) => b.account_number === "6280-3488-88")) {
+    throw new Error("Rekening BCA VVG (6280-3488-88) tidak ditemukan");
+  }
+
+  return body.data;
 }
 
 /** Buat + post penerimaan transfer via API (seed data test). */
@@ -135,7 +143,7 @@ test.describe("v40 rekonsiliasi", () => {
     const desc = uniq("SUSP-E2E");
     await seedPenerimaan(page, token, {
       bankAccountId: bca.id,
-      viharaId: bca.vihara_id,
+      viharaId: (await viharaIdsByCode()).VVG,
       date: today(),
       category: "donasi_belum_teridentifikasi",
       amount,
@@ -167,7 +175,7 @@ test.describe("v40 rekonsiliasi", () => {
 
     const token = await getToken(page);
     const banks = await getVvgBanks(page, token);
-    const viharaId = banks[0].vihara_id;
+    const viharaId = (await viharaIdsByCode()).VVG;
     const runs = await getRuns(page, token, viharaId);
     const currentMonth = today().slice(0, 7);
 

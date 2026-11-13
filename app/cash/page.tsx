@@ -123,8 +123,18 @@ export default function KasBankPage() {
                     </p>
                     <p className="mt-0.5 text-[13px] font-semibold text-km-ink">
                       {a.account_name}
-                      {showViharaName && a.vihara_name ? (
-                        <span className="block text-[11px] font-normal text-km-ink-soft">{a.vihara_name}</span>
+                      {/* Pemilik rekening adalah yayasan; vihara pengguna
+                          disebut hanya kalau rekeningnya memang dibatasi
+                          (kosong = seluruh vihara yayasan) — FV-36. */}
+                      {showViharaName && a.entity_name ? (
+                        <span className="block text-[11px] font-normal text-km-ink-soft">
+                          {a.entity_name}
+                        </span>
+                      ) : null}
+                      {a.vihara_names.length > 0 ? (
+                        <span className="block text-[10.5px] font-normal text-km-ink-muted">
+                          Khusus: {a.vihara_names.join(", ")}
+                        </span>
                       ) : null}
                     </p>
                     <p className="mt-[3px] tabular-nums text-[11px] text-km-ink-muted">{a.account_number}</p>
@@ -137,8 +147,55 @@ export default function KasBankPage() {
                     AKTIF
                   </span>
                 </div>
-                <p className="text-[11px] text-km-ink-muted">Saldo per buku</p>
-                <p className="mt-0.5 text-[22px] font-semibold text-km-green">{fmtRp(num(a.saldo))}</p>
+                {/* Dua angka yang berbeda arti (FV-36):
+                    - saldo utuh rekening = yang dicocokkan dengan rekening
+                      koran, hanya untuk pemegang akses tingkat yayasan;
+                    - porsi vihara = masuk − keluar milik viharanya sendiri.
+                    User berjangkauan vihara hanya berhak atas porsinya. */}
+                {a.saldo_penuh_tersedia ? (
+                  <>
+                    <p className="text-[11px] text-km-ink-muted">Saldo rekening (per buku)</p>
+                    <p className="mt-0.5 text-[22px] font-semibold text-km-green">
+                      {fmtRp(num(a.saldo))}
+                    </p>
+                    {a.porsi_per_vihara.length > 0 && (
+                      <div className="mt-1.5 space-y-0.5">
+                        {a.porsi_per_vihara.map((p) => (
+                          <p
+                            key={p.vihara_id}
+                            className="flex justify-between text-[11px] text-km-ink-muted"
+                          >
+                            <span>{p.vihara_name}</span>
+                            <span
+                              className={`tabular-nums ${num(p.porsi) < 0 ? "text-km-red" : ""}`}
+                            >
+                              {fmtRp(num(p.porsi))}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-km-ink-muted">Porsi vihara ini</p>
+                    <p
+                      className={`mt-0.5 text-[22px] font-semibold ${
+                        num(a.porsi) < 0 ? "text-km-red" : "text-km-green"
+                      }`}
+                    >
+                      {fmtRp(num(a.porsi))}
+                    </p>
+                    {num(a.porsi) < 0 && (
+                      <p className="mt-1 text-[11px] text-km-red-ink">
+                        Vihara ini memakai dana rekening bersama melebihi yang masuk untuknya.
+                      </p>
+                    )}
+                    <p className="mt-1 text-[10.5px] text-km-ink-muted">
+                      Rekening milik yayasan — saldo utuhnya memuat dana vihara lain.
+                    </p>
+                  </>
+                )}
                 <p className="mt-1 text-[11px] text-km-ink-muted">{rekonSubline(a.id)}</p>
               </div>
               <div className="flex gap-1.5 px-4 py-2">

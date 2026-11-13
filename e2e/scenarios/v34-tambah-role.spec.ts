@@ -32,8 +32,12 @@ function uniqRoleName(): string {
 }
 
 test.describe("v34 tambah role", () => {
-  test("admin_yayasan: boleh baca katalog, tidak boleh mengubah", async ({ page }) => {
-    await login(page, "adminYayasan");
+  test("admin_teratas: boleh baca katalog, tidak boleh mengubah", async ({ page }) => {
+    // Membaca katalog role butuh users.manage ATAU roles.manage. Sejak
+    // matriks penguji dipakai, admin_yayasan tidak lagi memegang keduanya;
+    // admin_teratas memegang users.manage saja — persis peran yang diuji di
+    // sini: boleh membaca, tidak boleh mengubah definisi role.
+    await login(page, "adminTeratas");
 
     // Menu Roles disembunyikan (butuh roles.manage).
     const nav = page.locator("nav").first();
@@ -46,7 +50,7 @@ test.describe("v34 tambah role", () => {
     await expect(page.getByRole("button", { name: "Edit permissions" })).toHaveCount(0);
 
     // Penegakan sebenarnya ada di API, bukan di UI.
-    const token = await apiToken("adminYayasan");
+    const token = await apiToken("adminTeratas");
     const res = await apiCall(token, "/api/admin/roles", {
       method: "POST",
       body: JSON.stringify({ name: "role_selundupan", permissions: [] }),

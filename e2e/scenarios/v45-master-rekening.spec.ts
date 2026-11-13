@@ -22,11 +22,18 @@ test.describe.configure({ mode: "serial" });
 test.describe("v45 master rekening", () => {
   let token = "";
   let viharaVvg = 0;
+  /** Yayasan pemilik rekening — sejak FV-36 rekening milik yayasan, bukan vihara. */
+  let entityVvg = 0;
   const dibersihkan: number[] = [];
 
   test.beforeAll(async () => {
     token = await apiToken("admin");
     viharaVvg = (await viharaIdsByCode()).VVG;
+    const viharas = await apiCall<{ data: Array<{ id: number; entity_id: number }> }>(
+      token,
+      "/api/viharas?per_page=100",
+    );
+    entityVvg = viharas.body.data.find((v) => v.id === viharaVvg)!.entity_id;
   });
 
   test.afterAll(async () => {
@@ -40,8 +47,11 @@ test.describe("v45 master rekening", () => {
     await page.goto("/admin/rekening");
 
     const kolom = (await page.locator("thead th").allTextContents()).map((t) => t.trim());
+    // Rekening milik YAYASAN sejak FV-36; vihara pengguna jadi kolom sendiri
+    // (kosong = seluruh vihara yayasan itu).
     expect(kolom).toEqual([
-      "Vihara",
+      "Yayasan",
+      "Vihara Pengguna",
       "Jenis",
       "Nama Bank / Kas",
       "No. Rekening",
@@ -70,7 +80,9 @@ test.describe("v45 master rekening", () => {
     await page.goto("/admin/rekening");
     await page.getByTestId("tambah-rekening").click();
 
-    await page.getByTestId("rekening-vihara").selectOption(String(viharaVvg));
+    // Pemilik rekening adalah YAYASAN (FV-36); vihara pengguna dibiarkan
+    // kosong = seluruh vihara yayasan itu boleh memakainya.
+    await page.getByTestId("rekening-yayasan").selectOption(String(entityVvg));
     await page.getByTestId("rekening-jenis").selectOption("bank");
     await page.getByTestId("rekening-nama-bank").fill("Bank Uji E2E");
     await page.getByTestId("rekening-nomor").fill(nomor);
@@ -94,7 +106,7 @@ test.describe("v45 master rekening", () => {
 
   test("FV-30: nomor rekening kembar ditolak dengan pesannya", async () => {
     const nomor = uniq("90").replace(/[^\d]/g, "");
-    const pertama = await apiCall<Rekening>(token, `/api/viharas/${viharaVvg}/bank-accounts`, {
+    const pertama = await apiCall<Rekening>(token, `/api/entities/${entityVvg}/bank-accounts`, {
       method: "POST",
       body: JSON.stringify({
         bank_name: "Bank Kembar E2E",
@@ -108,7 +120,7 @@ test.describe("v45 master rekening", () => {
 
     const kedua = await apiCall<{ message: string }>(
       token,
-      `/api/viharas/${viharaVvg}/bank-accounts`,
+      `/api/entities/${entityVvg}/bank-accounts`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -127,7 +139,7 @@ test.describe("v45 master rekening", () => {
     page,
   }) => {
     const nama = uniq("Kas Tunai E2E");
-    const kas = await apiCall<Rekening>(token, `/api/viharas/${viharaVvg}/bank-accounts`, {
+    const kas = await apiCall<Rekening>(token, `/api/entities/${entityVvg}/bank-accounts`, {
       method: "POST",
       body: JSON.stringify({
         type: "cash",
@@ -187,19 +199,25 @@ test.describe("v45 master rekening", () => {
     await expect(page.getByTestId(`status-rekening-${terpakai!.id}`)).toBeVisible();
   });
 
-  test("FV-30: daftar terbatas vihara dalam jangkauan user", async () => {
+  test("FV-30: daftar terbatas yayasan dalam jangkauan user", async () => {
+    // Rekening milik yayasan: yang membatasi daftar adalah yayasan pengguna,
+    // bukan viharanya. Bendahara VBM ada di yayasan yang sama dengan VVG,
+    // jadi yang dibuktikan di sini: tidak ada rekening yayasan LAIN.
     const vbm = await apiToken("bendaharaVbm");
-    const res = await apiCall<{ data: Array<{ vihara_name: string }> }>(vbm, "/api/master-rekening");
+    const res = await apiCall<{ data: Array<{ entity_id: number }> }>(
+      vbm,
+      "/api/master-rekening?per_page=100",
+    );
     expect(res.status).toBe(200);
     expect(res.body.data.length).toBeGreaterThan(0);
     for (const b of res.body.data) {
-      expect(b.vihara_name).toMatch(/Buddhametta/);
+      expect(b.entity_id).toBe(entityVvg);
     }
   });
 
   test("FV-30: tanpa izin kelola, menambah rekening ditolak", async () => {
     const viewer = await apiToken("viewer");
-    const res = await apiCall(viewer, `/api/viharas/${viharaVvg}/bank-accounts`, {
+    const res = await apiCall(viewer, `/api/entities/${entityVvg}/bank-accounts`, {
       method: "POST",
       body: JSON.stringify({
         bank_name: "Bank Nekat",

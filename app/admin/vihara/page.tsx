@@ -9,13 +9,7 @@ import { Modal } from "@/components/Modal";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { Pagination, usePaginasiLokal } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
-import {
-  createViharaBankAccount,
-  deleteViharaBankAccount,
-  listViharaBankAccounts,
-  updateViharaBankAccount,
-  ViharaBankAccount,
-} from "@/lib/kasBank";
+import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasBank";
 import {
   createPettyCashPic,
   deletePettyCashPic,
@@ -253,153 +247,58 @@ function ViharaRow({
 function BankAccountSection({
   viharaId,
   canManage,
-  onToast,
 }: {
   viharaId: number;
   canManage: boolean;
   onToast: (message: string, tone: "success" | "error") => void;
 }) {
+  // Rekening milik YAYASAN sejak FV-36, bukan vihara. Panel ini tinggal
+  // memperlihatkan rekening yang boleh dipakai vihara ini; pengelolaannya
+  // pindah ke Admin → Master Rekening supaya tidak ada dua tempat mengubah
+  // data yang sama.
   const [items, setItems] = useState<ViharaBankAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bankName, setBankName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [pending, setPending] = useState(false);
 
-  function reload() {
+  useEffect(() => {
     setLoading(true);
     listViharaBankAccounts(viharaId)
       .then(setItems)
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
-  }
-
-  useEffect(reload, [viharaId]);
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!bankName || !accountNumber || !accountName) return;
-    setPending(true);
-    try {
-      await createViharaBankAccount(viharaId, {
-        bank_name: bankName,
-        account_number: accountNumber,
-        account_name: accountName,
-      });
-      setBankName("");
-      setAccountNumber("");
-      setAccountName("");
-      onToast("Rekening ditambahkan", "success");
-      reload();
-    } catch (e) {
-      onToast(e instanceof Error ? e.message : "Gagal menambah rekening", "error");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleNonaktif(b: ViharaBankAccount) {
-    try {
-      await updateViharaBankAccount(b.id, { active: false });
-      onToast("Rekening dinonaktifkan", "success");
-      reload();
-    } catch (e) {
-      onToast(e instanceof Error ? e.message : "Gagal menonaktifkan", "error");
-    }
-  }
-
-  async function handleDelete(b: ViharaBankAccount) {
-    try {
-      await deleteViharaBankAccount(b.id);
-      onToast("Rekening dihapus", "success");
-      reload();
-    } catch (e) {
-      // 422 = rekening sudah dipakai transaksi → fallback nonaktifkan.
-      if ((e as { status?: number }).status === 422) {
-        onToast(e instanceof Error ? e.message : "Rekening dipakai transaksi", "error");
-        try {
-          await updateViharaBankAccount(b.id, { active: false });
-          onToast("Dinonaktifkan", "success");
-        } catch { /* biarkan error pertama tampil */ }
-        reload();
-      } else {
-        onToast(e instanceof Error ? e.message : "Gagal menghapus rekening", "error");
-      }
-    }
-  }
+  }, [viharaId]);
 
   return (
     <div className="rounded-lg border border-km-border bg-km-panel p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-km-ink-soft">
-        Rekening Bank
-      </p>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-km-ink-soft">
+          Rekening yang bisa dipakai
+        </p>
+        {canManage && (
+          <a href="/admin/rekening" className="text-[11px] text-km-blue hover:underline">
+            Kelola di Master Rekening →
+          </a>
+        )}
+      </div>
       {loading ? (
         <p className="py-2 text-[11px] text-km-ink-muted">Memuat…</p>
       ) : items.length === 0 ? (
-        <p className="py-2 text-[11px] text-km-ink-muted">Belum ada rekening.</p>
+        <p className="py-2 text-[11px] text-km-ink-muted">
+          Belum ada rekening yayasan yang bisa dipakai vihara ini.
+        </p>
       ) : (
-        <ul className="mb-2 space-y-1.5">
+        <ul className="space-y-1">
           {items.map((b) => (
-            <li key={b.id} className="flex items-center justify-between gap-2 border-b border-km-border pb-1.5 last:border-0">
-              <div className={b.active ? "" : "opacity-50"}>
-                <p className="text-[12px] font-medium text-km-ink">
-                  {b.bank_name}
-                  {!b.active && (
-                    <span className="ml-1.5 rounded bg-km-bg px-1.5 py-px text-[10px] font-normal text-km-ink-muted">
-                      Nonaktif
-                    </span>
-                  )}
-                </p>
-                <p className="tabular-nums text-[11px] text-km-ink-muted">{b.account_number}</p>
-                <p className="text-[10px] text-km-ink-muted">a.n. {b.account_name}</p>
-              </div>
-              {canManage && (
-                <div className="flex shrink-0 gap-2">
-                  {b.active && (
-                    <button
-                      onClick={() => handleNonaktif(b)}
-                      className="text-[11px] text-km-amber-ink hover:underline"
-                    >
-                      Nonaktif
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(b)}
-                    className="text-[11px] text-km-red-ink hover:underline"
-                  >
-                    Hapus
-                  </button>
-                </div>
-              )}
+            <li key={b.id} className="flex items-center justify-between text-[12px] text-km-ink">
+              <span>
+                {bankBrand(b.bank_name)} {b.account_number ?? ""}
+                {b.account_name ? (
+                  <span className="text-km-ink-muted"> · {b.account_name}</span>
+                ) : null}
+              </span>
+              <span className="text-[11px] text-km-ink-muted">{b.entity_name ?? ""}</span>
             </li>
           ))}
         </ul>
-      )}
-      {canManage && (
-        <form onSubmit={handleAdd} className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-[1fr_1.2fr_1.2fr_auto]">
-          <Input
-            value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            placeholder="Bank (BCA)"
-            required
-          />
-          <Input
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
-            placeholder="No. rekening"
-            className="font-mono"
-            required
-          />
-          <Input
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            placeholder="Atas nama"
-            required
-          />
-          <Button type="submit" size="sm" variant="primary" disabled={pending}>
-            Tambah
-          </Button>
-        </form>
       )}
     </div>
   );

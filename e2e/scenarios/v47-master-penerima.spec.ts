@@ -278,7 +278,9 @@ test.describe("v47 master penerima", () => {
         name: `Admin Penerima ${stamp}`,
         email,
         password: "password123",
-        role: "admin_yayasan",
+        // Melihat master Penerima butuh masters.view. Sejak matriks penguji
+        // dipakai, izin itu ada di admin_teratas ke atas — bukan admin_yayasan.
+        role: "admin_teratas",
         entity_id: yayasan.body.id,
         scope_type: "entity",
       }),

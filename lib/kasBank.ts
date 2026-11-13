@@ -21,7 +21,9 @@ export const JENIS_REKENING: Record<JenisRekening, string> = {
 
 export type ViharaBankAccount = {
   id: number;
-  vihara_id: number;
+  /** Pemilik rekening adalah YAYASAN, bukan vihara (FV-36). */
+  entity_id: number;
+  entity_name?: string | null;
   type: JenisRekening;
   bank_name: string;
   account_number: string | null;
@@ -47,9 +49,12 @@ export const listViharaBankAccounts = (
   ).then((r) => r.data);
 };
 
-/** Satu baris di layar Master Rekening — sudah berisi nama vihara & akun COA. */
+/** Satu baris di layar Master Rekening — sudah berisi yayasan & akun COA. */
 export type MasterRekeningRow = ViharaBankAccount & {
-  vihara_name: string | null;
+  entity_name: string | null;
+  /** Vihara pengguna. KOSONG = seluruh vihara di yayasan itu (FV-36). */
+  vihara_ids: number[];
+  vihara_names: string[];
   type_label: string;
   coa_account_name: string | null;
   label: string;
@@ -86,6 +91,8 @@ export const listMasterRekening = (params: {
 
 export type ViharaBankAccountInput = {
   type?: JenisRekening;
+  /** Kosong / tidak dikirim = seluruh vihara yayasan boleh memakai. */
+  vihara_ids?: number[];
   bank_name: string;
   account_number?: string | null;
   account_name?: string | null;
@@ -93,8 +100,8 @@ export type ViharaBankAccountInput = {
   description?: string | null;
 };
 
-export const createViharaBankAccount = (viharaId: number, payload: ViharaBankAccountInput) =>
-  api<ViharaBankAccount>(`/api/viharas/${viharaId}/bank-accounts`, {
+export const createViharaBankAccount = (entityId: number, payload: ViharaBankAccountInput) =>
+  api<ViharaBankAccount>(`/api/entities/${entityId}/bank-accounts`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -128,12 +135,22 @@ export const bankShortLabel = (b: { bank_name: string; account_number: string })
 
 export type KasBankAccount = {
   id: number;
-  vihara_id: number;
-  vihara_name?: string | null;
+  entity_id: number;
+  entity_name?: string | null;
+  /** Vihara pengguna. Kosong = seluruh vihara yayasan (FV-36). */
+  vihara_names: string[];
   bank_name: string;
   account_number: string;
   account_name: string;
-  saldo: string | number;
+  /**
+   * Saldo UTUH rekening — yang harus cocok dengan rekening koran. null untuk
+   * user berjangkauan vihara: saldo utuh memuat dana vihara lain.
+   */
+  saldo: string | number | null;
+  saldo_penuh_tersedia: boolean;
+  /** Masuk − keluar milik vihara dalam jangkauan user pada rekening ini. */
+  porsi: string | number;
+  porsi_per_vihara: { vihara_id: number; vihara_name: string; porsi: string }[];
 };
 
 export type KasBankMutasi = {

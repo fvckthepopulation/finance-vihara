@@ -177,22 +177,32 @@ test.describe("v98 form yayasan-vihara", () => {
     await expect(fRekening).not.toHaveValue("");
 
     // Pindah yayasan: vihara lama DAN rekeningnya dilepas, karena keduanya
-    // milik yayasan lama. Yayasan baru ini hanya punya satu vihara, jadi
-    // vihara itu langsung terpilih sendiri — yang penting vihara lama tidak
-    // tertinggal, dan rekening ikut kosong.
+    // milik yayasan lama. Yayasan baru punya dua unit — viharanya sendiri dan
+    // unit Umum/Pusat yang dibuat otomatis (P-01) — jadi tidak ada yang
+    // terpilih sendiri; yang penting vihara lama tidak tertinggal dan
+    // pilihannya memang milik yayasan baru.
     await fYayasan.selectOption(String(yayasanBaruId));
     await expect(fVihara).not.toHaveValue(String(viharaYdi.VVG));
-    await expect(fVihara).toHaveValue(String(viharaBaruId));
+    await expect
+      .poll(
+        async () =>
+          (await fVihara.locator("option").evaluateAll((o) =>
+            o.map((x) => (x as HTMLOptionElement).value).filter(Boolean),
+          )).sort(),
+        { timeout: 10_000 },
+      )
+      .toContain(String(viharaBaruId));
+    await fVihara.selectOption(String(viharaBaruId));
     await expect(fRekening).toHaveValue("");
 
-    // Daftar vihara ikut berganti ke yayasan yang baru.
-    await expect
-      .poll(async () =>
-        fVihara.locator("option").evaluateAll((opts) =>
-          opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean),
-        ),
-      )
-      .toEqual([String(viharaBaruId)]);
+    // Daftar vihara ikut berganti ke yayasan yang baru: viharanya sendiri
+    // plus unit Umum/Pusat yayasan itu (P-01) — tidak ada vihara YDI.
+    const opsiBaru = await fVihara.locator("option").evaluateAll((opts) =>
+      opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean),
+    );
+    expect(opsiBaru).toContain(String(viharaBaruId));
+    expect(opsiBaru).not.toContain(String(viharaYdi.VVG));
+    expect(opsiBaru).not.toContain(String(viharaYdi.VAD));
   });
 
   test("tersimpan ke vihara dari FORM, bukan pilihan header", async ({ page }) => {

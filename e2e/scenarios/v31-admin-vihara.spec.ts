@@ -24,12 +24,16 @@ test.describe("v31 admin vihara", () => {
     await login(page, "admin");
     await openKelolaVVG(page);
 
-    // 3 vihara di tabel utama.
+    // 3 vihara + unit Umum/Pusat yayasan yang dibuat otomatis (P-01).
     const viharaRows = page.locator("tbody tr").filter({ has: page.getByRole("button", { name: /Kelola|Tutup/ }) });
-    await expect(viharaRows).toHaveCount(3);
+    await expect(viharaRows).toHaveCount(4);
 
-    // Seksi Rekening Bank: BCA + Mandiri.
-    await expect(page.locator("p", { hasText: /^Rekening Bank$/ })).toBeVisible({ timeout: 10_000 });
+    // Rekening kini milik YAYASAN (FV-36): panel ini hanya memperlihatkan
+    // rekening yang boleh dipakai vihara ini; pengelolaannya pindah ke
+    // Admin → Master Rekening.
+    await expect(
+      page.locator("p", { hasText: /^Rekening yang bisa dipakai$/ }),
+    ).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("6280-3488-88").first()).toBeVisible();
     await expect(page.getByText(/Mandiri/).first()).toBeVisible();
 
