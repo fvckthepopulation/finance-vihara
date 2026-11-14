@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import {
   AdminRole,
   AdminUser,
@@ -125,7 +126,7 @@ export default function AdminUsersPage() {
               <Th>Role</Th>
               <Th>Jangkauan akses</Th>
               <Th>Created</Th>
-              <Th></Th>
+              <ThAksi />
             </tr>
           </thead>
           <tbody>
@@ -143,20 +144,23 @@ export default function AdminUsersPage() {
                 </Td>
                 <Td><ScopeCell user={u} /></Td>
                 <Td className="text-[11px] text-km-ink-muted">{u.created_at.slice(0, 10)}</Td>
-                <Td className="text-right">
-                  <button
+                <TdAksi>
+                  <Button
+                    size="sm"
+                    className="min-h-[32px]"
                     onClick={() => setShowForm({ user: u })}
-                    className="mr-2 text-[11px] text-km-blue hover:underline"
                   >
                     Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    className="min-h-[32px]"
                     onClick={() => handleDelete(u.id, u.name)}
-                    className="text-[11px] text-km-red-ink hover:underline"
                   >
                     Hapus
-                  </button>
-                </Td>
+                  </Button>
+                </TdAksi>
               </tr>
             ))}
           </tbody>
@@ -432,12 +436,4 @@ function ScopeCell({ user }: { user: AdminUser }) {
       </span>
     </span>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

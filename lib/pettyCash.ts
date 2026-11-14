@@ -55,6 +55,10 @@ export type PettyCashEntry = {
   source_bank_account?: { id: number; bank_name: string; account_number: string } | null;
   reference?: string | null;
   description?: string | null;
+  /** Kategori keperluan (usage) — menentukan akun bebannya (FV-58). */
+  category?: string | null;
+  /** Akun beban/lawan yang benar-benar dipakai jurnalnya. */
+  counterpart_account_code?: string | null;
   /** draft | posted | cancelled. cancelled = dibatalkan lewat jurnal pembalik. */
   status?: string;
   voided_at?: string | null;
@@ -124,6 +128,18 @@ export const listPettyCash = async (
   return [];
 };
 
+/**
+ * Kategori keperluan kas kecil (FV-58). Akun beban jurnalnya mengikuti
+ * kategori ini — beban program tidak boleh lagi mendarat di Beban Lainnya.
+ */
+export const KATEGORI_KAS_KECIL: Record<string, { label: string; akun: string }> = {
+  operasional: { label: "Keperluan Operasional", akun: "6100" },
+  paramita: { label: "Keperluan Paramita", akun: "5300" },
+  bhikkhu: { label: "Keperluan Bhikkhu", akun: "5100" },
+  perayaan: { label: "Keperluan Perayaan", akun: "5200" },
+  lainnya: { label: "Lainnya", akun: "6300" },
+};
+
 export type CreatePettyCashInput = {
   date: string;
   /** Wajib utk superadmin; user vihara tetap: server memaksa. */
@@ -133,6 +149,8 @@ export type CreatePettyCashInput = {
   amount: number;
   /** Hanya topup; absen = ambil dari Dana Tunai. */
   source_bank_account_id?: number;
+  /** Kategori keperluan — WAJIB untuk usage, dilarang untuk topup (FV-58). */
+  category?: string;
   /** Usage: no. bukti / kuitansi. Topup: keterangan transfer. */
   reference?: string;
   description?: string;

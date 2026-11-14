@@ -3,6 +3,7 @@
 import { SelectHTMLAttributes, FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
@@ -479,7 +480,7 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
             <tr>
               <Th>Tanggal</Th><Th>Ref</Th><Th>Donasi</Th>
               <Th className="text-right">Gross</Th><Th className="text-right">Komisi</Th>
-              <Th className="text-right">Net</Th><Th>Bank</Th><Th />
+              <Th className="text-right">Net</Th><Th>Bank</Th><ThAksi />
             </tr>
           </thead>
           <tbody>
@@ -503,7 +504,7 @@ function PgTab({ pg }: { pg: PgClearingData | null }) {
                       {s.bank_label}
                     </span>
                   </Td>
-                  <Td><KmLink refCode={s.ref} /></Td>
+                  <TdAksi><KmLink refCode={s.ref} /></TdAksi>
                 </tr>
               ))
             )}
@@ -800,15 +801,4 @@ function ReklasModal({
         </div>
     </Modal>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>
-      {children}
-    </th>
-  );
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 align-middle text-km-ink ${className}`}>{children}</td>;
 }

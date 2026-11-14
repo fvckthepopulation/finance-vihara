@@ -81,7 +81,9 @@ test.describe("v21 kas kecil", () => {
 
     const form = page.locator("form").filter({ hasText: "Penggunaan Kas Kecil" });
     await selectByLabelRegex(form.getByLabel("PIC Kas Kecil"), /Epi/);
-    await form.getByLabel("Keperluan").fill(uniq("E2E-PAKAI"));
+    // Kategori keperluan wajib sejak FV-58 — akun beban jurnalnya dari sini.
+    await form.getByTestId("kaskecil-kategori").selectOption("operasional");
+    await form.getByLabel("Keperluan", { exact: true }).fill(uniq("E2E-PAKAI"));
     await form.getByLabel("Jumlah (Rp)").fill("11000");
     await form.getByLabel("No. Bukti / Kuitansi").fill(uniq("KWT"));
     await form.getByRole("button", { name: "Catat Penggunaan" }).click();
@@ -102,7 +104,9 @@ test.describe("v21 kas kecil", () => {
     // kalau Lili memang belum punya mutasi, saringan apa pun terlihat "benar".
     const form = page.locator("form").filter({ hasText: "Penggunaan Kas Kecil" });
     await selectByLabelRegex(form.getByLabel("PIC Kas Kecil"), /Lili/);
-    await form.getByLabel("Keperluan").fill(uniq("E2E-LILI"));
+    // Kategori keperluan wajib sejak FV-58 — akun beban jurnalnya dari sini.
+    await form.getByTestId("kaskecil-kategori").selectOption("operasional");
+    await form.getByLabel("Keperluan", { exact: true }).fill(uniq("E2E-LILI"));
     await form.getByLabel("Jumlah (Rp)").fill("9000");
     await form.getByLabel("No. Bukti / Kuitansi").fill(uniq("KWT-LILI"));
     await form.getByRole("button", { name: "Catat Penggunaan" }).click();
@@ -112,14 +116,20 @@ test.describe("v21 kas kecil", () => {
     await expect(filter).toBeVisible({ timeout: 15_000 });
     await selectByLabelRegex(filter, /Lili/);
 
+    // Baris LAMA tetap terpasang selagi permintaan tersaring berjalan, dan
+    // mutasi Lili yang baru dibuat ada di urutan pertama — jadi memeriksa
+    // baris pertama saja bisa lolos terhadap daftar yang BELUM tersaring.
+    // Yang dipoll karena itu keseluruhan tabelnya.
     const rows = page.locator("tbody tr");
-    await expect(rows.first()).toContainText("Lili", { timeout: 15_000 });
-    const count = await rows.count();
-    expect(count).toBeGreaterThan(0);
-    for (let i = 0; i < Math.min(count, 10); i++) {
-      const text = await rows.nth(i).innerText();
-      expect(text).toContain("Lili");
-      expect(text).not.toContain("Epi");
-    }
+    await expect
+      .poll(
+        async () => {
+          const teks = await rows.allInnerTexts();
+          return teks.length > 0 && teks.every((t) => t.includes("Lili") && !t.includes("Epi"));
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    expect(await rows.count()).toBeGreaterThan(0);
   });
 });

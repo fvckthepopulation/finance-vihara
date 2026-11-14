@@ -13,6 +13,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 
 type Dibuat = { id: number; code?: string; status?: string };
@@ -98,7 +99,7 @@ test.describe("v39 persetujuan", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("55000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await selectByLabelRegex(page.getByTestId("form-rekening"), /Mandiri/);
     await page.getByLabel("No. Bukti / Referensi").fill(BUKTI);
     await simpan.click();
 
@@ -153,11 +154,8 @@ test.describe("v39 persetujuan", () => {
   // diam-diam tanpa jejak.
   test("penyetuju TIDAK boleh menghapus draft orang lain; yang diajukan ditolak dengan alasan", async () => {
     const tokenPencatat = await apiToken({ email: EMAIL_PENCATAT, password: PASSWORD });
-    const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      tokenPencatat,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}`,
-    );
-    const daftarRek = Array.isArray(rek.body) ? rek.body : (rek.body.data ?? []);
+    // Pengeluaran keluar dari Bank Operasional (1120) sejak FV-56.
+    const rekPengeluaran = await rekeningPengeluaran(tokenPencatat, viharaVvg);
 
     const draft = await apiCall<Dibuat>(tokenPencatat, "/api/pembayaran", {
       method: "POST",
@@ -167,7 +165,7 @@ test.describe("v39 persetujuan", () => {
         category: "biaya_operasional",
         name: "Biaya ATK",
         amount: 64000,
-        bank_account_id: daftarRek[0].id,
+        bank_account_id: rekPengeluaran,
       }),
     });
     expect(draft.status).toBe(201);
@@ -224,11 +222,8 @@ test.describe("v39 persetujuan", () => {
     // memeriksa vihara, jadi siapa pun yang boleh mencatat di viharanya
     // sendiri bisa menghapus draft vihara lain hanya dengan menebak id.
     const tokenVvg = await apiToken("bendahara");
-    const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      tokenVvg,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}`,
-    );
-    const daftarRek = Array.isArray(rek.body) ? rek.body : (rek.body.data ?? []);
+    // Pengeluaran keluar dari Bank Operasional (1120) sejak FV-56.
+    const rekPengeluaran = await rekeningPengeluaran(tokenVvg, viharaVvg);
 
     const draft = await apiCall<Dibuat>(tokenVvg, "/api/pembayaran", {
       method: "POST",
@@ -238,7 +233,7 @@ test.describe("v39 persetujuan", () => {
         category: "biaya_operasional",
         name: "Biaya ATK",
         amount: 71000,
-        bank_account_id: daftarRek[0].id,
+        bank_account_id: rekPengeluaran,
       }),
     });
     expect(draft.status).toBe(201);

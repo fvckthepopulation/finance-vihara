@@ -8,6 +8,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { uniq } from "../fixtures/uniq";
 
 type Dibuat = { id: number; code: string; status: string };
@@ -75,7 +76,7 @@ test.describe("v49 lanjut draft", () => {
     await expect(modal).toContainText(d.code);
   });
 
-  test("FV-44: Ubah mengisi form dengan isi draft; sesudah simpan tetap Draft", async ({
+  test("FV-46: Ubah membuka FORM Input Pengeluaran berisi draft; nomornya tetap", async ({
     page,
   }) => {
     const catatan = uniq("v49-ubah");
@@ -87,28 +88,59 @@ test.describe("v49 lanjut draft", () => {
     await page.getByTestId(`no-transaksi-${d.id}`).click();
     await page.getByTestId("ubah-draft").click();
 
-    const form = page.getByTestId("form-ubah-pengeluaran");
-    await expect(form).toBeVisible({ timeout: 15_000 });
-    // Form terisi data draft, bukan form kosong.
-    await expect(form.getByTestId("ubah-tanggal")).toHaveValue(
-      new Date().toISOString().slice(0, 10),
-    );
-    await expect(form.getByLabel("Vihara", { exact: true })).toHaveValue(/Vipassan/);
-
-    const bukti = uniq("BKT");
-    await form.getByTestId("ubah-jumlah").fill("250000");
-    await form.getByTestId("ubah-referensi").fill(bukti);
-    await form.getByTestId("simpan-draft").click();
-
-    await expect(page.getByTestId("detail-info")).toContainText("tetap Draft", {
+    // Halaman penuh, bukan modal — dan judulnya menyebut draftnya.
+    await page.waitForURL(`**/pembayaran?draft=${d.id}`);
+    await expect(page.locator("header")).toContainText(`Ubah Draft ${d.code}`, {
       timeout: 15_000,
     });
+    await expect(page.getByTestId("form-ubah-pengeluaran")).toHaveCount(0);
 
-    const sesudah = await apiCall<{ status: string; amount: string; reference: string }>(
+    // Field, urutan, dan tanda wajibnya sama persis dengan form input baru
+    // (FV-46 poin 3) — termasuk Metode Pembayaran, yang dulu hilang di modal.
+    for (const label of [
+      "Tanggal *",
+      "Jumlah (Rp) *",
+      "Kategori Biaya *",
+      "Nama Pengeluaran *",
+      "Metode Pembayaran *",
+      "Transfer dari Rekening *",
+      "Dibayarkan kepada / PIC",
+      "No. Bukti / Referensi",
+      "Catatan",
+    ]) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible();
+    }
+
+    // Isian draft sudah terisi, dan Yayasan/Vihara terkunci (poin 2 & 5).
+    await expect(page.getByTestId("form-vihara")).toBeDisabled();
+    await expect(page.getByTestId("form-yayasan")).toBeDisabled();
+    await expect(page.getByLabel("Catatan")).toHaveValue(catatan);
+
+    // Tombolnya mengikuti izin user (poin 4). Bendahara boleh mencatat dan
+    // mengajukan, tapi TIDAK menyetujui — jadi Submit memang tidak ada.
+    for (const t of ["tombol-batal", "tombol-draft", "tombol-ajukan"]) {
+      await expect(page.getByTestId(t)).toBeVisible();
+    }
+    await expect(page.getByTestId("tombol-submit")).toHaveCount(0);
+
+    const bukti = uniq("BKT");
+    const jumlah = page.getByLabel("Jumlah (Rp) *");
+    await expect(async () => {
+      await jumlah.fill("250000");
+      await expect(jumlah).toHaveValue("250.000", { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByLabel("No. Bukti / Referensi").fill(bukti);
+    await page.getByTestId("tombol-draft").click();
+
+    // Kembali ke daftar, baris yang SAMA diperbarui — bukan transaksi baru
+    // dengan nomor baru (poin 6).
+    await page.waitForURL("**/pengeluaran");
+    const sesudah = await apiCall<{ status: string; amount: string; reference: string; code: string }>(
       bendahara,
       `/api/pembayaran/${d.id}`,
     );
     expect(sesudah.body.status, "status tetap draft").toBe("draft");
+    expect(sesudah.body.code, "nomor transaksinya tetap").toBe(d.code);
     expect(Number(sesudah.body.amount)).toBe(250000);
     expect(sesudah.body.reference).toBe(bukti);
   });
@@ -133,17 +165,14 @@ test.describe("v49 lanjut draft", () => {
     );
 
     // Dilengkapi lewat API (bagian formnya sudah diuji di atas), lalu diajukan.
-    const rekening = await apiCall<{ data: Array<{ id: number }> }>(
-      bendahara,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}&type=bank`,
-    );
+    const rekPengeluaran = await rekeningPengeluaran(bendahara, viharaVvg);
     await apiCall(bendahara, `/api/pembayaran/${d.id}`, {
       method: "PATCH",
       body: JSON.stringify({
         amount: 150000,
         category: "biaya_operasional",
         name: "Biaya ATK",
-        bank_account_id: rekening.body.data[0].id,
+        bank_account_id: rekPengeluaran,
       }),
     });
 

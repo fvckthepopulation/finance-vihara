@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, API_URL, getToken } from "./api";
 import { Paginated } from "./api";
 
 export type JournalLine = {
@@ -29,13 +29,15 @@ export type JournalEntryRow = {
     code: string | null;
     name: string | null;
     counterparty: string | null;
+    /** Catatan penginput — keterangan terpisah, bukan deskripsi baris (FV-51). */
+    catatan?: string | null;
     reference: string | null;
     id: number;
   } | null;
   total_debit: string;
   total_credit: string;
   /** cancelled = dibatalkan lewat jurnal pembalik; barisnya tetap ada. */
-  status: "draft" | "posted" | "cancelled";
+  status: "draft" | "submitted" | "posted" | "rejected" | "cancelled";
   posted_at: string | null;
   created_by_user_id: number | null;
   entity?: { id: number; code: string };
@@ -134,6 +136,65 @@ export const createJournalEntry = (payload: CreateJournalEntryPayload) =>
   });
 
 /** Batalkan jurnal terposting — server menulis jurnal pembalik. */
+/**
+ * Siklus persetujuan jurnal manual (FV-53).
+ *
+ * Sebelumnya jurnal manual lahir sebagai draft dan berhenti di situ: tidak
+ * ada jalan menuju posted, padahal laporan hanya membaca yang posted. Jadi
+ * saldo awal dan koreksi tidak pernah berpengaruh ke mana pun.
+ */
+/**
+ * Unduh Jurnal & Buku Besar sebagai .xlsx (FV-59).
+ *
+ * Mengikuti saringan yang sedang aktif. Tidak lewat api(): berkas biner
+ * butuh token di header, jadi tidak bisa dibuka dengan <a href> polos.
+ */
+export async function unduhJurnalExcel(params: {
+  status?: string;
+  source?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  vihara_id?: number | null;
+}): Promise<{ blob: Blob; filename: string }> {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+  }
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const res = await fetch(`${API_URL}/api/journal-entries/export?${sp}`, { headers });
+  if (!res.ok) {
+    let pesan = `Gagal mengunduh jurnal (HTTP ${res.status})`;
+    try {
+      const payload = (await res.json()) as { message?: string };
+      if (payload.message) pesan = payload.message;
+    } catch {
+      /* biarkan pesan bawaan */
+    }
+    throw new Error(pesan);
+  }
+
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const cocok = /filename="?([^";]+)"?/.exec(cd);
+
+  return { blob: await res.blob(), filename: cocok?.[1] ?? "Jurnal.xlsx" };
+}
+
+export const submitJournalEntry = (id: number) =>
+  api<JournalEntryRow>(`/api/journal-entries/${id}/submit`, { method: "POST" });
+
+export const postJournalEntry = (id: number) =>
+  api<JournalEntryRow>(`/api/journal-entries/${id}/post`, { method: "POST" });
+
+export const rejectJournalEntry = (id: number, reason: string) =>
+  api<JournalEntryRow>(`/api/journal-entries/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+
 export const voidJournalEntry = (id: number, reason: string) =>
   api<unknown>(`/api/journal-entries/${id}/void`, {
     method: "POST",

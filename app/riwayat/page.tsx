@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { DanaTag, DANA_CATEGORY_LABEL } from "@/components/DanaTag";
@@ -282,10 +283,10 @@ export default function RiwayatPage() {
                 <Th>Keterangan</Th>
                 <Th>Donatur / Sumber</Th>
                 <Th>Kategori</Th>
-                <Th className="text-right">Jumlah</Th>
+                <Th className="whitespace-nowrap text-right">Jumlah</Th>
                 <Th>Status</Th>
                 <Th>Bukti</Th>
-                {bisaBatalkan && <Th>Aksi</Th>}
+                {bisaBatalkan && <ThAksi />}
               </tr>
             </thead>
             <tbody>
@@ -364,9 +365,9 @@ export default function RiwayatPage() {
                       <BuktiLink row={r} onError={setError} />
                     </Td>
                     {bisaBatalkan && (
-                      <Td>
+                      <TdAksi>
                         <BatalkanButton row={r} onError={setError} onDone={reload} />
-                      </Td>
+                      </TdAksi>
                     )}
                   </tr>
                 ))
@@ -404,20 +405,6 @@ export default function RiwayatPage() {
       </Card>
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 align-middle text-km-ink ${className}`}>{children}</td>;
 }
 
 /**

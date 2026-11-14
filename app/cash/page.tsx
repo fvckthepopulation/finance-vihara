@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { Toast } from "@/components/Toast";
+import { TransferRekeningForm } from "@/components/TransferRekeningForm";
+import { useAuth } from "@/lib/useAuth";
+import { Td, Th } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Select } from "@/components/Field";
@@ -21,6 +25,12 @@ const fmtTgl = (iso: string) =>
 export default function KasBankPage() {
   const router = useRouter();
   const { viharaId, fixed, ready } = useVihara();
+  const { can } = useAuth();
+  // Transfer antar rekening (FV-56) — memindahkan dana, jadi izinnya
+  // mengikuti pengelolaan rekening, bukan pencatatan transaksi.
+  const bisaKelolaRekening = can("cash.account.manage");
+  const [transfer, setTransfer] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [data, setData] = useState<KasBankData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +97,8 @@ export default function KasBankPage() {
 
   const accounts = data?.bank_accounts ?? [];
   const pics = data?.kas_kecil.pics ?? [];
-  const kasTunai = num(data?.kas_tunai);
+  const kasTunai = num(data?.kas_tunai?.total);
+  const kasTunaiPerVihara = data?.kas_tunai?.per_vihara ?? [];
   const showViharaName = !fixed && viharaId == null;
 
   const mutasi = useMemo(() => {
@@ -103,7 +114,33 @@ export default function KasBankPage() {
   }
 
   return (
-    <AppShell title="Kas & Bank" subtitle="Posisi kas tunai dan rekening bank vihara">
+    <AppShell
+      title="Kas & Bank"
+      subtitle="Posisi kas tunai dan rekening bank vihara"
+      actions={
+        bisaKelolaRekening && (
+          <Button
+            variant="primary"
+            data-testid="tombol-transfer"
+            onClick={() => setTransfer(true)}
+          >
+            Transfer Antar Rekening
+          </Button>
+        )
+      }
+    >
+      {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
+      {transfer && (
+        <TransferRekeningForm
+          viharaId={viharaId}
+          onClose={() => setTransfer(false)}
+          onSelesai={(pesan) => {
+            setTransfer(false);
+            setToast(pesan);
+            reload();
+          }}
+        />
+      )}
       <div className="space-y-3.5">
         {error && (
           <p className="rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink whitespace-pre-line">
@@ -217,6 +254,46 @@ export default function KasBankPage() {
             </Card>
           ))}
 
+          {/* Kartu Kas Tunai (FV-52) — uang yang sudah diterima tapi belum
+              disetor ke bank. Sejajar dengan kartu rekening dan Kas Kecil,
+              bukan lagi satu baris teks kecil. */}
+          <Card data-testid="kartu-kas-tunai">
+            <div className="border-b border-km-border px-4 py-3.5">
+              <div className="mb-2.5 flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[.06em] text-km-ink-muted">
+                    Kas Tunai
+                  </p>
+                  <p className="mt-0.5 text-[13px] font-semibold text-km-ink">
+                    Kas Penerimaan Langsung
+                  </p>
+                  <p className="kode mt-[3px] text-[11px] text-km-ink-muted">1115</p>
+                </div>
+                <span className="rounded bg-km-amber-soft px-2 py-[3px] text-[10px] font-semibold text-km-amber">
+                  TUNAI
+                </span>
+              </div>
+              {/* Uang tunai dipegang per vihara, jadi rinciannya disebut. */}
+              {kasTunaiPerVihara.length > 1 && (
+                <div className="mb-2 flex flex-wrap gap-4">
+                  {kasTunaiPerVihara.map((v) => (
+                    <div key={v.vihara_id ?? "yayasan"}>
+                      <p className="text-[10px] text-km-ink-muted">{v.vihara}</p>
+                      <p className="text-[12px] font-medium tabular-nums text-km-ink">
+                        {fmtRp(num(v.saldo))}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] uppercase tracking-[.06em] text-km-ink-muted">Saldo</p>
+              <p className="mt-0.5 text-[22px] font-semibold text-km-amber">{fmtRp(kasTunai)}</p>
+              <p className="mt-1 text-[11px] text-km-ink-muted">
+                Disetor ke bank lewat Rekonsiliasi, dari baris rekening koran.
+              </p>
+            </div>
+          </Card>
+
           {/* Kartu Kas Kecil */}
           <Card>
             <div className="border-b border-km-border px-4 py-3.5">
@@ -246,9 +323,7 @@ export default function KasBankPage() {
               <p className="mt-0.5 text-[22px] font-semibold text-km-amber">
                 {fmtRp(num(data?.kas_kecil.total))}
               </p>
-              {kasTunai > 0 && (
-                <p className="mt-1 text-[11px] text-km-ink-muted">Kas tunai: {fmtRp(kasTunai)}</p>
-              )}
+
             </div>
             <div className="px-4 py-2">
               <Button size="sm" className="w-full justify-center" onClick={() => router.push("/petty-cash")}>
@@ -296,8 +371,8 @@ export default function KasBankPage() {
                     <Th>Keterangan</Th>
                     <Th>Rekening</Th>
                     <Th>Tipe</Th>
-                    <Th className="text-right">Masuk</Th>
-                    <Th className="text-right">Keluar</Th>
+                    <Th className="whitespace-nowrap text-right">Masuk</Th>
+                    <Th className="whitespace-nowrap text-right">Keluar</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,10 +411,10 @@ export default function KasBankPage() {
                               </span>
                             )}
                           </Td>
-                          <Td className="text-right tabular-nums text-km-green">
+                          <Td className="whitespace-nowrap text-right tabular-nums text-km-green">
                             {masuk > 0 ? fmtRp(masuk) : "—"}
                           </Td>
-                          <Td className="text-right tabular-nums text-km-red">
+                          <Td className="whitespace-nowrap text-right tabular-nums text-km-red">
                             {keluar > 0 ? fmtRp(keluar) : "—"}
                           </Td>
                         </tr>
@@ -354,15 +429,4 @@ export default function KasBankPage() {
       </div>
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>
-      {children}
-    </th>
-  );
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

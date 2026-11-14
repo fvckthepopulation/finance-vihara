@@ -71,50 +71,107 @@ test.describe("v52 penerimaan sejajar pengeluaran", () => {
     }
   });
 
-  test("FV-45 poin 5: Master Penerimaan bisa dikelola, akun COA opsional", async ({ page }) => {
+  test("FV-49: Master Penerimaan menampilkan pembatasan dan akun yang dipakai", async ({
+    page,
+  }) => {
     await login(page, "admin");
     await page.goto("/admin/penerimaan");
 
-    // Dua tingkat, dengan sebutan penerimaan — bukan salinan layar
-    // pengeluaran yang labelnya tertinggal.
-    await expect(page.getByText("Kategori Dana", { exact: true }).first()).toBeVisible({
+    await expect(page.getByTestId("tambah-nama")).toHaveText("+ Tambah Nama Penerimaan", {
       timeout: 15_000,
     });
-    await expect(page.getByTestId("tambah-nama")).toHaveText("+ Tambah Nama Penerimaan");
-    await expect(page.locator("thead").first()).toContainText("Akun Bawaan");
 
-    // Nama baru boleh TANPA akun COA: kosong = ikuti aturan kanal.
-    const nama = uniq("Dana Uji E2E");
-    await page.getByTestId("tambah-nama").click();
-    const form = page.getByTestId("form-nama");
-    await expect(form).toBeVisible({ timeout: 15_000 });
-    await form.getByTestId("nama-kategori").selectOption("dana_perayaan");
-    await form.getByTestId("nama-nama").fill(nama);
-    // Akun dibiarkan kosong — dan form tidak menahannya.
-    await form.getByTestId("nama-akun").selectOption("");
-    await form.getByTestId("simpan-nama").click();
-    await expect(page.getByText(/Nama Penerimaan ditambahkan/)).toBeVisible({ timeout: 15_000 });
-
-    const dibuat = await apiCall<{ data: Array<{ id: number; name: string; coa_account_code: string | null }> }>(
-      admin,
-      `/api/master-penerimaan/nama?q=${encodeURIComponent(nama)}`,
+    // Kolom Jenis Pembatasan ada, dan akunnya BUKAN "—" lagi: ditampilkan
+    // per kanal sesuai pembatasannya (FV-49 poin 1 & 2).
+    const kolom = (await page.locator("thead").first().locator("th").allTextContents()).map((t) =>
+      t.trim(),
     );
-    const baris = dibuat.body.data.find((n) => n.name === nama);
-    expect(baris, "nama penerimaan tersimpan").toBeTruthy();
-    expect(baris!.coa_account_code, "akun kosong = ikuti aturan kanal").toBeNull();
+    expect(kolom).toContain("Jenis Pembatasan");
+    expect(kolom).toContain("Akun Pendapatan");
 
-    // Akun yang BUKAN pendapatan ditolak — bukan tersimpan diam-diam.
-    const nekat = await apiCall<{ message?: string }>(admin, "/api/master-penerimaan/nama", {
-      method: "POST",
-      body: JSON.stringify({
-        category: "dana_perayaan",
-        name: uniq("Dana Akun Salah"),
-        coa_account_code: "6100",
-      }),
-    });
-    expect(nekat.status).toBe(422);
+    const barisBhikkhu = page.getByTestId("kategori-row-dana_bhikkhu");
+    await expect(barisBhikkhu).toContainText("Dengan Pembatasan");
+    await expect(barisBhikkhu).toContainText("KM 4120 · Transfer 4220 · Tunai 4320");
+    await expect(page.getByTestId("kategori-row-dana_operasional")).toContainText(
+      "KM 4110 · Transfer 4210 · Tunai 4310",
+    );
+    await expect(page.getByTestId("kategori-row-donasi_belum_teridentifikasi")).toContainText(
+      "2310",
+    );
 
-    await apiCall(admin, `/api/master-penerimaan/nama/${baris!.id}`, { method: "DELETE" });
+    // Nama Penerimaan mewarisi akun kategorinya (poin 3), dan tidak punya
+    // field akun sendiri lagi.
+    await expect(page.locator('[data-testid^="nama-row-"]').first()).toContainText(
+      "KM 4120 · Transfer 4220 · Tunai 4320",
+    );
+    await page.getByTestId("tambah-nama").click();
+    const formNama = page.getByTestId("form-nama");
+    await expect(formNama).toBeVisible({ timeout: 15_000 });
+    await expect(formNama.getByTestId("nama-akun")).toHaveCount(0);
+    await expect(formNama.getByTestId("nama-akun-warisan")).toBeDisabled();
+    await page.getByRole("button", { name: "Batal" }).click();
+  });
+
+  test("FV-49: kategori dana baru wajib menyatakan pembatasannya, lalu langsung bisa dipakai", async ({
+    page,
+  }) => {
+    const kode = `dana_uji_${Date.now().toString().slice(-6)}`;
+    await login(page, "admin");
+    await page.goto("/admin/penerimaan");
+    await page.getByTestId("tambah-kategori").click();
+
+    const form = page.getByTestId("form-kategori");
+    await expect(form).toBeVisible({ timeout: 15_000 });
+    await form.getByTestId("kategori-kode").fill(kode);
+    await form.getByTestId("kategori-nama").fill("Dana Pembangunan Uji");
+    await form.getByTestId("kategori-pembatasan").selectOption("dp");
+    await form.getByTestId("simpan-kategori").click();
+    await expect(page.getByText(/Kategori ditambahkan/)).toBeVisible({ timeout: 15_000 });
+
+    try {
+      // Akun pendapatannya langsung diturunkan dari pembatasannya (poin 4).
+      const master = await apiCall<{ data: Array<{ code: string; restriction: string; akun_per_metode: Record<string, string> }> }>(
+        admin,
+        `/api/master-penerimaan/kategori?q=${kode}`,
+      );
+      const baris = master.body.data.find((k) => k.code === kode);
+      expect(baris?.restriction).toBe("dp");
+      expect(baris?.akun_per_metode.transfer).toBe("4220");
+
+      // Dan penerimaan dengan kategori itu dijurnal ke akun tersebut.
+      const dibuat = await apiCall<Dibuat>(admin, "/api/penerimaan", {
+        method: "POST",
+        body: JSON.stringify({
+          date: HARI_INI(),
+          method: "transfer",
+          vihara_id: viharaVvg,
+          category: kode,
+          amount: 1000000,
+          bank_account_id: (
+            await apiCall<{ data: Array<{ id: number }> }>(
+              admin,
+              `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}&type=bank`,
+            )
+          ).body.data[0].id,
+        }),
+      });
+      expect(dibuat.status).toBe(201);
+      dibersihkan.push(dibuat.body.id);
+      const isi = await apiCall<{ credit_account_code: string }>(
+        admin,
+        `/api/penerimaan/${dibuat.body.id}`,
+      );
+      expect(isi.body.credit_account_code, "Dengan Pembatasan + transfer = 4220").toBe("4220");
+    } finally {
+      const master = await apiCall<{ data: Array<{ id: number; code: string }> }>(
+        admin,
+        `/api/master-penerimaan/kategori?q=${kode}`,
+      );
+      const baris = master.body.data.find((k) => k.code === kode);
+      if (baris) {
+        await apiCall(admin, `/api/master-penerimaan/kategori/${baris.id}`, { method: "DELETE" });
+      }
+    }
   });
 
   test("FV-45 poin 1: tiga tombol niat, dan draft tidak membuat jurnal", async ({ page }) => {
@@ -352,7 +409,7 @@ test.describe("v52 penerimaan sejajar pengeluaran", () => {
     }
   });
 
-  test("FV-45 poin 2: draft penerimaan bisa diubah, diajukan, dan dihapus pembuatnya", async ({
+  test("FV-45 poin 2 & FV-46: draft penerimaan dilanjutkan di form Input Penerimaan", async ({
     page,
   }) => {
     const catatan = uniq("v52-lanjut");
@@ -368,28 +425,39 @@ test.describe("v52 penerimaan sejajar pengeluaran", () => {
     await expect(modal.getByTestId("detail-status")).toContainText("Draft");
 
     await modal.getByTestId("ubah-draft").click();
-    const form = page.getByTestId("form-ubah-penerimaan");
-    await expect(form).toBeVisible({ timeout: 15_000 });
-    await form.getByTestId("ubah-jumlah").fill("90000");
-    await form.getByTestId("ubah-kategori").selectOption("dana_perayaan");
-    await form.getByTestId("ubah-nama").selectOption({ label: "Dana Kathina" });
-    await form.getByTestId("simpan-draft").click();
-    await expect(page.getByTestId("detail-info")).toContainText("tetap Draft", {
+    await page.waitForURL(`**/penerimaan?draft=${d.id}`);
+    await expect(page.locator("header")).toContainText(`Ubah Draft ${d.code}`, {
       timeout: 15_000,
     });
+    await expect(page.getByTestId("form-vihara")).toBeDisabled();
+
+    const jumlah = page.getByLabel("Jumlah (Rp) *");
+    await expect(async () => {
+      await jumlah.fill("90000");
+      await expect(jumlah).toHaveValue("90.000", { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByTestId("form-kategori").selectOption("dana_perayaan");
+    await page.getByTestId("form-nama").selectOption({ label: "Dana Kathina" });
+    await page.getByTestId("tombol-draft").click();
+    await page.waitForURL("**/penerimaan/daftar");
 
     const sesudah = await apiCall<{
       status: string;
       amount: string;
+      code: string;
       credit_account_code: string | null;
     }>(bendahara, `/api/penerimaan/${d.id}`);
     expect(sesudah.body.status).toBe("draft");
+    expect(sesudah.body.code).toBe(d.code);
     expect(Number(sesudah.body.amount)).toBe(90000);
     // Mengubah kategori menentukan ulang akun pendapatannya — dulu kolom ini
     // justru jadi NULL karena hanya kategori suspense yang punya
     // default_credit di konstanta.
     expect(sesudah.body.credit_account_code, "akun kredit terisi").toBeTruthy();
 
+    // Lalu diajukan dari layar detailnya.
+    await page.getByTestId("filter-cari").fill(catatan);
+    await page.getByTestId(`no-transaksi-${d.id}`).click();
     await page.getByTestId("ajukan-draft").click();
     await expect(page.getByTestId("detail-info")).toContainText("menunggu persetujuan", {
       timeout: 15_000,

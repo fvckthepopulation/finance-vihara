@@ -13,6 +13,7 @@ import {
 import { listEntities, MasterEntity } from "@/lib/masters";
 import { useAuth } from "@/lib/useAuth";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { ImportExcelButton } from "@/components/ImportExcelButton";
@@ -167,7 +168,7 @@ export default function CoaPage() {
                     <Th className="text-center">Header?</Th>
                     <Th className="text-right">Usage</Th>
                     <Th>Status</Th>
-                    {canManage && <Th></Th>}
+                    {canManage && <ThAksi />}
                   </tr>
                 </thead>
                 <tbody>
@@ -182,7 +183,7 @@ export default function CoaPage() {
                       <Td className="text-center">
                         {a.is_header && <Badge tone="info">HDR</Badge>}
                       </Td>
-                      <Td className="text-right">
+                      <Td className="whitespace-nowrap text-right tabular-nums">
                         {a.usage_count > 0 ? (
                           <Badge tone="warn">{a.usage_count}×</Badge>
                         ) : (
@@ -195,20 +196,23 @@ export default function CoaPage() {
                         </Badge>
                       </Td>
                       {canManage && (
-                        <Td className="text-right">
-                          <button
+                        <TdAksi>
+                          <Button
+                            size="sm"
+                            className="min-h-[32px]"
                             onClick={() => setShowForm({ account: a })}
-                            className="mr-2 text-[11px] text-km-blue hover:underline"
                           >
                             Edit
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            className="min-h-[32px]"
                             onClick={() => handleDelete(a)}
-                            className="text-[11px] text-km-red-ink hover:underline"
                           >
                             Hapus
-                          </button>
-                        </Td>
+                          </Button>
+                        </TdAksi>
                       )}
                     </tr>
                   ))}
@@ -394,12 +398,4 @@ function CoaForm({
     </Modal>
   );
 
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

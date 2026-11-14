@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
@@ -18,6 +19,9 @@ import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { Toast } from "@/components/Toast";
 import {
   AkunMaster,
+  JenisPembatasan,
+  LABEL_PEMBATASAN,
+  ringkasAkunPerMetode,
   createKategori,
   createNama,
   deleteKategori,
@@ -76,6 +80,13 @@ export type LabelMaster = {
   bawaanHint: string;
   /** Contoh kode kategori di keterangan form. */
   contohKode: string;
+  /** Kategori punya Jenis Pembatasan ISAK 35? (kategori dana saja) */
+  punyaPembatasan: boolean;
+  /**
+   * Nama punya akun COA sendiri? Penerimaan: tidak — akunnya diwarisi dari
+   * pembatasan kategorinya (FV-49).
+   */
+  akunPerNama: boolean;
 };
 
 const KonteksLabel = createContext<LabelMaster | null>(null);
@@ -275,23 +286,24 @@ function TabelKategori({
             <tr>
               <Th>Kode</Th>
               <Th>Nama Kategori</Th>
+              {L.punyaPembatasan && <Th>Jenis Pembatasan</Th>}
               <Th>Keterangan</Th>
-              <Th>Akun Bawaan</Th>
+              <Th>{L.punyaPembatasan ? "Akun Pendapatan" : "Akun Bawaan"}</Th>
               <Th className="text-right">{L.nama}</Th>
               <Th>Status</Th>
-              <Th>Aksi</Th>
+              <ThAksi />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                <td colSpan={L.punyaPembatasan ? 8 : 7} className="px-3 py-8 text-center text-km-ink-muted">
                   Memuat…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                <td colSpan={L.punyaPembatasan ? 8 : 7} className="px-3 py-8 text-center text-km-ink-muted">
                   {cari || status ? "Data tidak ditemukan" : "Belum ada kategori"}
                 </td>
               </tr>
@@ -307,19 +319,29 @@ function TabelKategori({
                 >
                   <Td className="whitespace-nowrap kode text-[11px]">{k.code}</Td>
                   <Td>{k.name}</Td>
+                  {L.punyaPembatasan && (
+                    <Td className="whitespace-nowrap text-[11px]">
+                      {k.restriction_label ?? "—"}
+                    </Td>
+                  )}
                   <Td className="text-[11px] text-km-ink-muted">{k.description || "—"}</Td>
+                  {/* Akun yang BENAR-BENAR dipakai saat menjurnal. Untuk
+                      kategori dana akunnya diturunkan per kanal, jadi
+                      ditampilkan ketiganya — bukan "—" (FV-49). */}
                   <Td className="whitespace-nowrap kode text-[11px]">
-                    {k.default_debit_code ?? "—"}
+                    {L.punyaPembatasan
+                      ? ringkasAkunPerMetode(k.akun_per_metode)
+                      : (k.default_debit_code ?? "—")}
                   </Td>
-                  <Td className="text-right tabular-nums">
+                  <Td className="whitespace-nowrap text-right tabular-nums">
                     {k.jumlah_nama_aktif} / {k.jumlah_nama}
                   </Td>
                   <Td>
                     {k.active ? <Badge tone="success">Aktif</Badge> : <Badge tone="neutral">Nonaktif</Badge>}
                   </Td>
-                  <Td onClick={(e) => e.stopPropagation()}>
+                  <TdAksi onClick={(e) => e.stopPropagation()}>
                     {bisaKelola ? (
-                      <div className="flex flex-wrap gap-1.5">
+                      <>
                         <Button
                           size="sm"
                           className="min-h-[32px]"
@@ -347,11 +369,11 @@ function TabelKategori({
                             Hapus
                           </Button>
                         )}
-                      </div>
+                      </>
                     ) : (
                       <span className="text-[11px] text-km-ink-muted">—</span>
                     )}
-                  </Td>
+                  </TdAksi>
                 </tr>
               ))
             )}
@@ -401,6 +423,9 @@ function FormKategori({
   const L = useLabel();
   const [code, setCode] = useState(item?.code ?? "");
   const [name, setName] = useState(item?.name ?? "");
+  const [restriction, setRestriction] = useState<JenisPembatasan | "">(
+    item?.restriction ?? "",
+  );
   const [description, setDescription] = useState(item?.description ?? "");
   const [akunBawaan, setAkunBawaan] = useState(item?.default_debit_code ?? "");
   const [pending, setPending] = useState(false);
@@ -414,6 +439,7 @@ function FormKategori({
       if (item) {
         await updateKategori(L.jenis, item.id, {
           name,
+          ...(L.punyaPembatasan ? { restriction: (restriction || null) as JenisPembatasan } : {}),
           description: description || null,
           default_debit_code: akunBawaan || null,
         });
@@ -422,6 +448,7 @@ function FormKategori({
         await createKategori(L.jenis, {
           code,
           name,
+          ...(L.punyaPembatasan ? { restriction: (restriction || null) as JenisPembatasan } : {}),
           description: description || null,
           default_debit_code: akunBawaan || null,
         });
@@ -481,6 +508,31 @@ function FormKategori({
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
+        {L.punyaPembatasan && (
+          <Field
+            label="Jenis Pembatasan *"
+            hint={
+              item?.in_use
+                ? "Tidak bisa diubah: kategori ini sudah dipakai transaksi."
+                : "Menentukan akun pendapatan yang dipakai saat menjurnal, dan kolom TP/DP di laporan ISAK 35."
+            }
+          >
+            <Select
+              required
+              data-testid="kategori-pembatasan"
+              value={restriction}
+              disabled={item?.in_use ?? false}
+              onChange={(e) => setRestriction(e.target.value as JenisPembatasan | "")}
+            >
+              <option value="">— Pilih jenis pembatasan —</option>
+              {(Object.keys(LABEL_PEMBATASAN) as JenisPembatasan[]).map((k) => (
+                <option key={k} value={k}>
+                  {LABEL_PEMBATASAN[k]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field
           label="Akun bawaan"
           hint={L.bawaanHint}
@@ -642,7 +694,7 @@ function TabelNama({
               <Th>{L.akun}</Th>
               <Th>Berlaku di</Th>
               <Th>Status</Th>
-              <Th>Aksi</Th>
+              <ThAksi />
             </tr>
           </thead>
           <tbody>
@@ -675,9 +727,19 @@ function TabelNama({
                   </Td>
                   <Td className="whitespace-nowrap">{n.category_label}</Td>
                   <Td className="whitespace-nowrap">
-                    <span className="kode text-[11px]">{n.coa_account_code ?? "—"}</span>
-                    {n.coa_account_name && (
-                      <span className="ml-1 text-[11px] text-km-ink-muted">{n.coa_account_name}</span>
+                    {L.akunPerNama ? (
+                      <>
+                        <span className="kode text-[11px]">{n.coa_account_code ?? "—"}</span>
+                        {n.coa_account_name && (
+                          <span className="ml-1 text-[11px] text-km-ink-muted">
+                            {n.coa_account_name}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="kode text-[11px] text-km-ink-soft">
+                        {ringkasAkunPerMetode(n.akun_per_metode ?? null)}
+                      </span>
                     )}
                   </Td>
                   <Td className="whitespace-nowrap text-[11px] text-km-ink-soft">
@@ -686,9 +748,9 @@ function TabelNama({
                   <Td>
                     {n.active ? <Badge tone="success">Aktif</Badge> : <Badge tone="neutral">Nonaktif</Badge>}
                   </Td>
-                  <Td>
+                  <TdAksi>
                     {bisaKelola ? (
-                      <div className="flex flex-wrap gap-1.5">
+                      <>
                         <Button
                           size="sm"
                           className="min-h-[32px]"
@@ -716,11 +778,11 @@ function TabelNama({
                             Hapus
                           </Button>
                         )}
-                      </div>
+                      </>
                     ) : (
                       <span className="text-[11px] text-km-ink-muted">—</span>
                     )}
-                  </Td>
+                  </TdAksi>
                 </tr>
               ))
             )}
@@ -784,10 +846,10 @@ function FormNama({
   // Kategori baru dipilih dan akunnya masih kosong → pakai akun bawaan
   // kategori itu sebagai saran, supaya tidak perlu diisi dari nol.
   useEffect(() => {
-    if (coa) return;
+    if (!L.akunPerNama || coa) return;
     const k = kategoriList.find((x) => x.code === category);
     if (k?.default_debit_code) setCoa(k.default_debit_code);
-  }, [category, kategoriList, coa]);
+  }, [L.akunPerNama, category, kategoriList, coa]);
 
   async function simpan(e: FormEvent) {
     e.preventDefault();
@@ -862,21 +924,37 @@ function FormNama({
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
-        <Field label={L.akunWajib ? `${L.akun} *` : L.akun} hint={L.akunHint}>
-          <Select
-            required={L.akunWajib}
-            data-testid="nama-akun"
-            value={coa}
-            onChange={(e) => setCoa(e.target.value)}
-          >
-            <option value="">{L.akunWajib ? "— Pilih akun —" : "— Tanpa akun tetap —"}</option>
-            {akun.map((a) => (
-              <option key={a.code} value={a.code}>
-                {a.code} · {a.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {L.akunPerNama ? (
+          <Field label={L.akunWajib ? `${L.akun} *` : L.akun} hint={L.akunHint}>
+            <Select
+              required={L.akunWajib}
+              data-testid="nama-akun"
+              value={coa}
+              onChange={(e) => setCoa(e.target.value)}
+            >
+              <option value="">— Pilih akun —</option>
+              {akun.map((a) => (
+                <option key={a.code} value={a.code}>
+                  {a.code} · {a.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : (
+          /* Penerimaan: akunnya milik kategori, bukan nama. Ditampilkan
+             sebagai keterangan supaya admin tetap bisa memeriksanya tanpa
+             tergoda mengubahnya di sini (FV-49). */
+          <Field label={L.akun} hint={L.akunHint}>
+            <Input
+              readOnly
+              disabled
+              data-testid="nama-akun-warisan"
+              value={ringkasAkunPerMetode(
+                kategoriList.find((k) => k.code === category)?.akun_per_metode ?? null,
+              )}
+            />
+          </Field>
+        )}
         <Field label="Keterangan">
           <Textarea
             rows={2}
@@ -887,31 +965,5 @@ function FormNama({
         </Field>
       </div>
     </Modal>
-  );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  className = "",
-  onClick,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  onClick?: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <td className={`px-3 py-2.5 text-km-ink ${className}`} onClick={onClick}>
-      {children}
-    </td>
   );
 }

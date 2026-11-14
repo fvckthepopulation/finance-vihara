@@ -254,3 +254,83 @@ test.describe("v53 kerapian sidebar & modal", () => {
     }
   });
 });
+
+/**
+ * Kolom Aksi tidak boleh menyisakan ruang kosong di kanan (FV-47 & FV-48),
+ * dan nominal tidak boleh terpotong dua baris karenanya.
+ *
+ * Diuji di beberapa menu sekaligus, bukan hanya di Jurnal, karena FV-48
+ * memang meminta perbaikannya berlaku lewat komponen tabel bersama.
+ */
+test.describe("v53 kolom aksi tidak melebar", () => {
+  const HALAMAN = [
+    { url: "/jurnal", nama: "Jurnal & Buku Besar" },
+    { url: "/admin/penerimaan", nama: "Master Penerimaan" },
+    { url: "/admin/pengeluaran", nama: "Master Pengeluaran" },
+    { url: "/pengeluaran", nama: "Daftar Pengeluaran" },
+    { url: "/admin/rekening", nama: "Master Rekening" },
+  ];
+
+  for (const { url, nama } of HALAMAN) {
+    test(`FV-47 & FV-48: kolom Aksi ${nama} selebar isinya`, async ({ page }) => {
+      await login(page, "admin");
+      await page.goto(url);
+
+      const tabel = page.locator("table").first();
+      // Baris pertama bisa jadi masih "Memuat…" — yang ditunggu baris yang
+      // benar-benar punya tombol aksi, kalau tidak tesnya hampa.
+      const sel = tabel.locator("tbody tr td:last-child").filter({ has: page.locator("button") });
+      await expect(sel.first()).toBeVisible({ timeout: 20_000 });
+
+      // Lebar kolom ditentukan baris dengan tombol TERBANYAK. Baris lain
+      // boleh menyisakan ruang — FV-48 poin 2 justru memintanya ("selebar
+      // tombol yang tidak tampil"). Jadi yang diperiksa: baris terlebar
+      // merapat ke tepi kolom, bukan setiap baris.
+      const jumlahBaris = Math.min(await sel.count(), 12);
+      const sisa: number[] = [];
+      for (let i = 0; i < jumlahBaris; i++) {
+        const kotakSel = await sel.nth(i).boundingBox();
+        const tombol = sel.nth(i).locator("button");
+        const n = await tombol.count();
+        if (!kotakSel || n === 0) continue;
+        const kiri = await tombol.first().boundingBox();
+        const kanan = await tombol.nth(n - 1).boundingBox();
+        if (!kiri || !kanan) continue;
+        expect(kiri.x - kotakSel.x, `${nama}: jarak kiri sel aksi`).toBeLessThanOrEqual(16);
+        sisa.push(kotakSel.x + kotakSel.width - (kanan.x + kanan.width));
+      }
+
+      expect(sisa.length, `${nama}: perlu baris beraksi untuk diukur`).toBeGreaterThan(0);
+      expect(
+        Math.min(...sisa),
+        `${nama}: kolom Aksi lebih lebar daripada baris tombol terbanyaknya`,
+      ).toBeLessThanOrEqual(16);
+    });
+  }
+
+  test("FV-47: nominal Debit/Kredit di Jurnal tidak terpotong dua baris", async ({ page }) => {
+    await login(page, "admin");
+    await page.goto("/jurnal");
+
+    const baris = page.locator("tbody tr").first();
+    await expect(baris).toBeVisible({ timeout: 20_000 });
+
+    // Tinggi sel nominal tidak boleh lebih dari satu setengah baris teks:
+    // dua baris berarti "Rp" dan angkanya terpisah, keluhan FV-47 poin 3.
+    for (const kolom of [6, 7]) {
+      const sel = baris.locator("td").nth(kolom - 1);
+      const teks = (await sel.innerText()).trim();
+      if (!teks.startsWith("Rp")) continue;
+      // Tinggi SEL bukan ukuran yang benar: sel ikut meregang mengikuti baris
+      // (kolom Deskripsi bisa beberapa baris). Yang diukur jumlah baris yang
+      // benar-benar dipakai teksnya.
+      const ukuran = await sel.evaluate((el) => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        return { baris: r.getClientRects().length, wrap: getComputedStyle(el).whiteSpace };
+      });
+      expect(ukuran.wrap, "sel nominal tidak boleh dibungkus").toContain("nowrap");
+      expect(ukuran.baris, `nominal "${teks}" terpotong jadi lebih dari satu baris`).toBe(1);
+    }
+  });
+});

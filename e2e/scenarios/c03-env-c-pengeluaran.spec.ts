@@ -94,34 +94,37 @@ test.describe("ENV-C · Input Pengeluaran", () => {
     return res.body;
   }
 
-  test("C-PGL-01: Biaya Bhikkhu Rp 800.000 dari Bank Donasi → Dr 5100 / Kr 1130", async () => {
+  // CATATAN PERUBAHAN: sheet ENV-C menulis C-PGL-01 dan C-PGL-02 dikredit ke
+  // 1130 Bank Donasi. Keputusan FV-56 (jawaban (a) atas Perlu Konfirmasi no.1)
+  // mengubahnya: SELURUH pengeluaran keluar dari 1120 Bank Operasional, dan
+  // dana donasi dipindahkan lebih dulu lewat transfer antar rekening.
+  // Pembatasan dananya dilacak di aset neto 3200 (FV-55), bukan lewat
+  // rekening mana yang dipakai.
+  test("C-PGL-01: Biaya Bhikkhu Rp 800.000 → Dr 5100 / Kr 1120 (FV-56)", async () => {
     await ujiPengeluaran({
       category: "biaya_bhikkhu",
       name: "Biaya Makan Bhikkhu",
       amount: 800_000,
-      bankAccountId: rekDonasi,
+      bankAccountId: rekOperasional,
       debit: "5100",
-      kredit: "1130",
+      kredit: "1120",
     });
   });
 
-  test("C-PGL-02: Biaya Perayaan Rp 1.200.000 dari Bank Donasi → Dr 5200 / Kr 1130", async () => {
+  test("C-PGL-02: Biaya Perayaan Rp 1.200.000 → Dr 5200 / Kr 1120 (FV-56)", async () => {
     await ujiPengeluaran({
       category: "biaya_perayaan",
       name: "Biaya Perayaan Waisak",
       amount: 1_200_000,
-      bankAccountId: rekDonasi,
+      bankAccountId: rekOperasional,
       debit: "5200",
-      kredit: "1130",
+      kredit: "1120",
     });
   });
 
+  // Sejak FV-56 data contoh memang punya rekening Bank Operasional, jadi
+  // skenario ini tidak lagi dilewati — inilah yang dulu berstatus Blocked.
   test("C-PGL-03: Biaya Operasional Rp 250.000 dari Bank Operasional → Dr 6100 / Kr 1120", async () => {
-    test.skip(
-      rekOperasional === 0,
-      "Data contoh belum punya rekening ber-akun 1120 (Bank Operasional) — " +
-        "skenario ini butuh rekening itu untuk membuktikan sisi kreditnya.",
-    );
     await ujiPengeluaran({
       category: "biaya_operasional",
       name: "Biaya ATK",
@@ -132,14 +135,14 @@ test.describe("ENV-C · Input Pengeluaran", () => {
     });
   });
 
-  test("C-PGL-04 (P-19): Biaya Paramita Rp 300.000 → Dr 5300 / Kr 1130", async () => {
+  test("C-PGL-04 (P-19): Biaya Paramita Rp 300.000 → Dr 5300 / Kr 1120 (FV-56)", async () => {
     await ujiPengeluaran({
       category: "biaya_paramita",
       name: "Biaya Baksos",
       amount: 300_000,
-      bankAccountId: rekDonasi,
+      bankAccountId: rekOperasional,
       debit: "5300",
-      kredit: "1130",
+      kredit: "1120",
     });
   });
 
@@ -284,7 +287,8 @@ test.describe("ENV-C · Input Pengeluaran", () => {
         name: "Biaya ATK",
         amount: 10_000,
         vihara_id: viharaVvg,
-        bank_account_id: rekDonasi,
+        // Pengeluaran keluar dari Bank Operasional sejak FV-56.
+        bank_account_id: rekOperasional,
         payee_name: "Vendor Uji",
       }),
     });

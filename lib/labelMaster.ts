@@ -20,6 +20,8 @@ export const LABEL_PENGELUARAN: LabelMaster = {
   akunWajib: true,
   bawaanHint: "Dipakai hanya kalau Nama Pengeluaran belum punya akunnya sendiri.",
   contohKode: "biaya_kebersihan",
+  punyaPembatasan: false,
+  akunPerNama: true,
 };
 
 export const LABEL_PENERIMAAN: LabelMaster = {
@@ -30,15 +32,16 @@ export const LABEL_PENERIMAAN: LabelMaster = {
   nama: "Nama Penerimaan",
   namaKecil: "nama penerimaan",
   akun: "Akun Pendapatan (COA)",
-  // Sengaja panjang: ini keputusan akuntansi, bukan sekadar isian. Mengisinya
-  // memakukan akun pendapatan satu nama dan melepasnya dari pembedaan kanal
-  // yang dipakai laporan ISAK 35.
+  // Akun penerimaan TIDAK dipilih per nama (FV-49): diturunkan dari
+  // pembatasan kategorinya × kanal penerimaan, dan itulah yang ditampilkan.
   akunHint:
-    "Kosongkan untuk mengikuti aturan bawaan: akun pendapatan ditentukan kanal " +
-    "penerimaan (KalyanaMitta / transfer / tunai) dan pembatasan dananya. Isi " +
-    "hanya bila nama ini memang selalu masuk ke satu akun tertentu.",
+    "Diwarisi dari Kategori Dana — ditentukan jenis pembatasannya dan kanal " +
+    "penerimaannya (KalyanaMitta / transfer / tunai).",
   akunWajib: false,
   bawaanHint:
-    "Akun pendapatan bawaan kategori. Kosong = ikuti aturan kanal × pembatasan (ISAK 35).",
+    "Hanya untuk kategori Belum Teridentifikasi (suspense), mis. 2310. " +
+    "Kategori Tanpa/Dengan Pembatasan memakai aturan kanal × pembatasan.",
   contohKode: "dana_pendidikan",
+  punyaPembatasan: true,
+  akunPerNama: false,
 };

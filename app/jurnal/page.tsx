@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
@@ -22,8 +23,32 @@ import {
   getJournalEntry,
   journalSourceLabel,
   listJournalEntries,
+  postJournalEntry,
+  rejectJournalEntry,
+  submitJournalEntry,
+  unduhJurnalExcel,
 } from "@/lib/journal";
 import { useAuth } from "@/lib/useAuth";
+
+/**
+ * Keadaan jurnal manual sesudah FV-53. Sengaja memakai sebutan yang sama
+ * dengan transaksi lain supaya approver tidak perlu belajar dua kosakata.
+ */
+const LABEL_JURNAL: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Menunggu Persetujuan",
+  posted: "Posted",
+  rejected: "Ditolak",
+  cancelled: "Dibatalkan",
+};
+
+const TONE_JURNAL: Record<string, "neutral" | "warn" | "success" | "danger"> = {
+  draft: "neutral",
+  submitted: "warn",
+  posted: "success",
+  rejected: "danger",
+  cancelled: "danger",
+};
 
 const fmtRp = (n: string | number) =>
   "Rp " + Math.round(typeof n === "string" ? Number(n) : n).toLocaleString("id-ID");
@@ -36,6 +61,33 @@ export default function JurnalPage() {
   const { can } = useAuth();
   const canCreate = can("journal.create");
   const canVoid = can("journal.void");
+  const canApprove = can("journal.approve");
+  const bisaExport = can("reports.export");
+  const [mengunduh, setMengunduh] = useState(false);
+
+  async function unduh() {
+    setMengunduh(true);
+    setError(null);
+    try {
+      const { blob, filename } = await unduhJurnalExcel({
+        status: status || undefined,
+        source: source || undefined,
+        from: from || undefined,
+        to: to || undefined,
+        q: q || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mengunduh jurnal");
+    } finally {
+      setMengunduh(false);
+    }
+  }
 
   const [rows, setRows] = useState<JournalEntryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +165,40 @@ export default function JurnalPage() {
     }
   }
 
+  // Siklus persetujuan jurnal manual (FV-53). Pola tombolnya menyamai
+  // pengeluaran: pencatat mengajukan, penyetuju memposting atau menolak, dan
+  // pemegang kedua izin boleh langsung memposting draftnya sendiri.
+  async function handleAjukan(r: JournalEntryRow) {
+    try {
+      await submitJournalEntry(r.id);
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal mengajukan jurnal");
+    }
+  }
+
+  async function handlePost(r: JournalEntryRow) {
+    try {
+      await postJournalEntry(r.id);
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal memposting jurnal");
+    }
+  }
+
+  async function handleReject(r: JournalEntryRow) {
+    const alasan = window.prompt(
+      `Tolak jurnal #${r.id}?\n\nJurnal dikembalikan ke pembuatnya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
+    );
+    if (alasan === null) return;
+    try {
+      await rejectJournalEntry(r.id, alasan.trim());
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal menolak jurnal");
+    }
+  }
+
   async function handleDelete(r: JournalEntryRow) {
     if (!confirm(`Hapus draft JE #${r.id}? Hanya draft manual yang bisa dihapus.`)) return;
     try {
@@ -128,9 +214,22 @@ export default function JurnalPage() {
       title="Jurnal & Buku Besar"
       subtitle="Manual journal entry + lihat semua JE (auto-posted dari pembayaran/penerimaan/escrow)."
       actions={
-        canCreate && (
-          <Button variant="primary" onClick={() => setShowForm(true)}>+ Manual JE</Button>
-        )
+        <>
+          {/* Unduhan mengikuti saringan yang sedang aktif (FV-59). */}
+          {bisaExport && (
+            <Button
+              variant="default"
+              data-testid="unduh-jurnal"
+              disabled={mengunduh || rows.length === 0}
+              onClick={unduh}
+            >
+              {mengunduh ? "Menyiapkan…" : "Download Excel"}
+            </Button>
+          )}
+          {canCreate && (
+            <Button variant="primary" onClick={() => setShowForm(true)}>+ Manual JE</Button>
+          )}
+        </>
       }
     >
       {error && (
@@ -186,13 +285,13 @@ export default function JurnalPage() {
                 <Th>Vihara</Th>
                 <Th>Deskripsi</Th>
                 <Th>Akun (COA)</Th>
-                <Th className="text-right">Debit</Th>
-                <Th className="text-right">Kredit</Th>
+                <Th className="whitespace-nowrap text-right">Debit</Th>
+                <Th className="whitespace-nowrap text-right">Kredit</Th>
                 <Th>Status</Th>
                 {/* Kolom aksi berjudul dan berlebar tetap (FV-41): tanpa
                     lebar pasti, tombol Detail bergeser mengikuti aksi kedua
                     di baris itu, jadi posisinya berbeda per baris. */}
-                <Th className="w-[13.5rem]">Aksi</Th>
+                <ThAksi />
               </tr>
             </thead>
             <tbody>
@@ -245,78 +344,102 @@ export default function JurnalPage() {
                     {(r.lines ?? []).slice(0, 3).map((l) => l.account_code).join(", ")}
                     {(r.lines?.length ?? 0) > 3 && ` …+${(r.lines?.length ?? 0) - 3}`}
                   </Td>
-                  <Td className="text-right">{fmtRp(r.total_debit)}</Td>
-                  <Td className="text-right">{fmtRp(r.total_credit)}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums">{fmtRp(r.total_debit)}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums">{fmtRp(r.total_credit)}</Td>
                   <Td>
-                    <Badge
-                      tone={
-                        r.status === "cancelled"
-                          ? "danger"
-                          : r.status === "posted"
-                            ? "success"
-                            : "neutral"
-                      }
-                    >
-                      {r.status === "cancelled"
-                        ? "Dibatalkan"
-                        : r.status === "posted"
-                          ? "Posted"
-                          : "Draft"}
+                    <Badge tone={TONE_JURNAL[r.status] ?? "neutral"}>
+                      {LABEL_JURNAL[r.status] ?? r.status}
                     </Badge>
                   </Td>
                   {/* Satu susunan untuk semua baris: Detail selalu di kiri
                       kolom, aksi kedua selalu di sebelahnya, dan keduanya
                       tombol — bukan campur tombol dengan teks bergaris bawah
                       yang tidak terbaca sebagai aksi (FV-41). */}
-                  <Td>
-                    <div className="flex items-center gap-1.5">
+                  <TdAksi>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="min-h-[32px]"
+                      onClick={() => setViewId(r.id)}
+                      data-testid={`detail-je-${r.id}`}
+                    >
+                      Detail
+                    </Button>
+                    {r.source?.type === "pembayaran" && (
                       <Button
                         size="sm"
                         variant="default"
                         className="min-h-[32px]"
-                        onClick={() => setViewId(r.id)}
-                        data-testid={`detail-je-${r.id}`}
+                        onClick={() => setSumberId(r.source!.id)}
+                        data-testid={`sumber-je-${r.id}`}
                       >
-                        Detail
+                        Transaksi
                       </Button>
-                      {r.source?.type === "pembayaran" && (
+                    )}
+                    {canCreate &&
+                      r.reference_type === "manual" &&
+                      ["draft", "rejected"].includes(r.status) && (
                         <Button
                           size="sm"
-                          variant="default"
+                          variant="primary"
                           className="min-h-[32px]"
-                          onClick={() => setSumberId(r.source!.id)}
-                          data-testid={`sumber-je-${r.id}`}
+                          onClick={() => handleAjukan(r)}
+                          data-testid={`ajukan-je-${r.id}`}
                         >
-                          Transaksi
+                          Ajukan
                         </Button>
                       )}
-                      {canCreate && r.reference_type === "manual" && r.status === "draft" && (
+                    {canApprove &&
+                      r.reference_type === "manual" &&
+                      (r.status === "submitted" ||
+                        (r.status === "draft" && canCreate)) && (
                         <Button
                           size="sm"
-                          variant="danger"
+                          variant="success"
                           className="min-h-[32px]"
-                          onClick={() => handleDelete(r)}
-                          data-testid={`hapus-je-${r.id}`}
+                          onClick={() => handlePost(r)}
+                          data-testid={`posting-je-${r.id}`}
                         >
-                          Hapus
+                          {r.status === "submitted" ? "Setujui" : "Posting"}
                         </Button>
                       )}
-                      {/* Hanya jurnal MANUAL. Jurnal yang lahir dari
-                          pembayaran/penerimaan dibatalkan lewat transaksinya,
-                          supaya dokumen dan buku besar tidak berbeda. */}
-                      {canVoid && r.reference_type === "manual" && r.status === "posted" && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          className="min-h-[32px]"
-                          onClick={() => handleVoid(r)}
-                          data-testid={`batalkan-je-${r.id}`}
-                        >
-                          Batalkan
-                        </Button>
-                      )}
-                    </div>
-                  </Td>
+                    {canApprove && r.reference_type === "manual" && r.status === "submitted" && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="min-h-[32px]"
+                        onClick={() => handleReject(r)}
+                        data-testid={`tolak-je-${r.id}`}
+                      >
+                        Tolak
+                      </Button>
+                    )}
+                    {canCreate && r.reference_type === "manual" && r.status === "draft" && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        className="min-h-[32px]"
+                        onClick={() => handleDelete(r)}
+                        data-testid={`hapus-je-${r.id}`}
+                      >
+                        Hapus
+                      </Button>
+                    )}
+                    {/* Hanya jurnal MANUAL. Jurnal yang lahir dari
+                        pembayaran/penerimaan dibatalkan lewat transaksinya,
+                        supaya dokumen dan buku besar tidak berbeda. */}
+                    {canVoid && r.reference_type === "manual" && r.status === "posted" && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        className="min-h-[32px]"
+                        onClick={() => handleVoid(r)}
+                        data-testid={`batalkan-je-${r.id}`}
+                      >
+                        Batalkan
+                      </Button>
+                    )}
+                  </TdAksi>
                 </tr>
               ))}
             </tbody>
@@ -590,6 +713,23 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
                 <div><span className="text-km-ink-muted">Tanggal:</span> {entry.entry_date}</div>
                 <div><span className="text-km-ink-muted">Sumber:</span> {journalSourceLabel(entry.reference_type)}</div>
                 <div className="col-span-2"><span className="text-km-ink-muted">Deskripsi:</span> {entry.description}</div>
+                {/* Penerima/donatur dan No. Bukti ikut tampil di detail,
+                    seperti di daftar jurnal (FV-51 poin 3). */}
+                {(entry.source?.counterparty || entry.source?.reference) && (
+                  <div className="col-span-2">
+                    <span className="text-km-ink-muted">Pihak / No. Bukti:</span>{" "}
+                    {[entry.source?.counterparty, entry.source?.reference]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                )}
+                {/* Catatan penginput: keterangan TERPISAH, tidak lagi
+                    menimpa deskripsi baris jurnal (FV-51 poin 2). */}
+                {entry.source?.catatan && (
+                  <div className="col-span-2" data-testid="je-catatan">
+                    <span className="text-km-ink-muted">Catatan:</span> {entry.source.catatan}
+                  </div>
+                )}
                 {entry.reference && (
                   <div className="col-span-2"><span className="text-km-ink-muted">Reference:</span> {entry.reference}</div>
                 )}
@@ -601,8 +741,8 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
                   <tr>
                     <Th>Akun</Th>
                     <Th>Deskripsi</Th>
-                    <Th className="text-right">Debit</Th>
-                    <Th className="text-right">Kredit</Th>
+                    <Th className="whitespace-nowrap text-right">Debit</Th>
+                    <Th className="whitespace-nowrap text-right">Kredit</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -610,8 +750,8 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
                     <tr key={l.id} className="border-t border-km-border">
                       <Td className="kode">{l.account_code}<br /><span className="text-[10.5px] text-km-ink-muted">{l.account?.name}</span></Td>
                       <Td>{l.description ?? "—"}</Td>
-                      <Td className="text-right">{Number(l.debit) > 0 ? fmtRp(l.debit) : "—"}</Td>
-                      <Td className="text-right">{Number(l.credit) > 0 ? fmtRp(l.credit) : "—"}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{Number(l.debit) > 0 ? fmtRp(l.debit) : "—"}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{Number(l.credit) > 0 ? fmtRp(l.credit) : "—"}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -621,12 +761,4 @@ function ViewJournalModal({ id, onClose }: { id: number; onClose: () => void }) 
         </div>
     </Modal>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) {
-  return <td colSpan={colSpan} className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

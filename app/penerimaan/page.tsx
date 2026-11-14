@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
@@ -16,12 +18,15 @@ import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasB
 import {
   CategoryOption,
   createPenerimaan,
+  fetchPenerimaanAttachment,
+  getPenerimaan,
   getPenerimaanCategories,
   PenerimaanStatus,
   postPenerimaan,
   STATUS_LABEL,
   STATUS_TONE,
   submitPenerimaan,
+  updatePenerimaan,
   uploadPenerimaanAttachment,
 } from "@/lib/penerimaan";
 import { listTransactionNames, TransactionName } from "@/lib/transactionNames";
@@ -61,6 +66,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 type Aksi = "draft" | "ajukan" | "submit";
 
 export default function PenerimaanPage() {
+  // useSearchParams butuh batas Suspense saat halaman di-prerender.
+  return (
+    <Suspense fallback={null}>
+      <IsiPenerimaan />
+    </Suspense>
+  );
+}
+
+function IsiPenerimaan() {
   const { user, can } = useAuth();
   // Header hanya menyaring tabel di bawah form. Vihara transaksi berasal
   // dari form — alasannya sama dengan Input Pengeluaran.
@@ -88,6 +102,14 @@ export default function PenerimaanPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<"" | PenerimaanStatus>("");
+  // Draft yang sedang diubah — form yang dipakai sama dengan input baru
+  // (FV-46, diterapkan juga di sini supaya kedua modul tidak menyimpang).
+  const router = useRouter();
+  const draftParam = useSearchParams().get("draft");
+  const draftId = draftParam ? Number(draftParam) : null;
+  const [draftKode, setDraftKode] = useState<string | null>(null);
+  const [draftLampiran, setDraftLampiran] = useState<string | null>(null);
+  const [memuatDraft, setMemuatDraft] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // ----- masters -----
@@ -147,6 +169,34 @@ export default function PenerimaanPage() {
       alive = false;
     };
   }, [category, viharaId]);
+
+  useEffect(() => {
+    if (draftId == null) return;
+    let alive = true;
+    setMemuatDraft(true);
+    getPenerimaan(draftId)
+      .then((d) => {
+        if (!alive) return;
+        setDraftKode(d.code);
+        setScope({ entityId: d.entity_id ?? null, viharaId: d.vihara?.id ?? null });
+        setDate(d.date.slice(0, 10));
+        setAmount(Number(d.amount) || 0);
+        setCategory(d.category ?? "");
+        setName(d.name ?? "");
+        setMethod(d.method === "transfer" ? "transfer" : "tunai");
+        setDestAccount(d.bank_account?.id != null ? String(d.bank_account.id) : "");
+        setDonatur(d.source_name ?? "");
+        setDonaturId(d.source_payee_id ?? null);
+        setReference(d.reference ?? "");
+        setNotes(d.description ?? "");
+        setDraftLampiran(d.attachment_path ?? null);
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "Gagal memuat draft"))
+      .finally(() => alive && setMemuatDraft(false));
+    return () => {
+      alive = false;
+    };
+  }, [draftId]);
 
   const reloadToday = useCallback(() => {
     if (!viharaReady) return;
@@ -215,36 +265,53 @@ export default function PenerimaanPage() {
     setError(null);
     setPending(aksi);
     try {
-      const created = await createPenerimaan({
+      const isian = {
         date,
         amount: amount || undefined,
         category: category || undefined,
         name: name || undefined,
         method,
-        bank_account_id:
-          method === "transfer" && destAccount ? Number(destAccount) : undefined,
+        // Tunai tidak lewat rekening: null mengembalikan tujuannya ke Kas
+        // Penerimaan Langsung kalau metodenya diubah dari transfer.
+        bank_account_id: method === "transfer" && destAccount ? Number(destAccount) : null,
         source_name: donatur || null,
         source_payee_id: donaturId,
         reference: reference || null,
         description: notes || null,
-        vihara_id: scope.viharaId,
-        draft: aksi === "draft",
-      });
+      };
+
+      const baris =
+        draftId != null
+          ? await updatePenerimaan(draftId, isian)
+          : await createPenerimaan({
+              ...isian,
+              vihara_id: scope.viharaId,
+              draft: aksi === "draft",
+            });
 
       // Lampiran diunggah selagi masih draft: kalau gagal, transaksi belum
       // naik ke mana pun dan bisa diulang.
       if (attachment) {
-        await uploadPenerimaanAttachment(created.id, attachment);
+        await uploadPenerimaanAttachment(baris.id, attachment);
       }
 
       if (aksi === "ajukan") {
-        await submitPenerimaan(created.id);
+        await submitPenerimaan(baris.id);
         setToast("Penerimaan diajukan — menunggu persetujuan");
       } else if (aksi === "submit") {
-        await postPenerimaan(created.id);
+        await postPenerimaan(baris.id);
         setToast("Penerimaan disimpan dan disetujui");
       } else {
-        setToast("Tersimpan sebagai draft — belum diajukan");
+        setToast(
+          draftId != null
+            ? "Draft diperbarui — statusnya tetap Draft"
+            : "Tersimpan sebagai draft — belum diajukan",
+        );
+      }
+
+      if (draftId != null) {
+        router.push("/penerimaan/daftar");
+        return;
       }
 
       resetForm({ keepScope: true });
@@ -257,17 +324,32 @@ export default function PenerimaanPage() {
   }
 
   return (
-    <AppShell title="Input Penerimaan" subtitle="Catat dana masuk ke vihara">
+    <AppShell
+      title={draftKode ? `Ubah Draft ${draftKode}` : "Input Penerimaan"}
+      subtitle={
+        draftKode
+          ? "Melanjutkan draft — nomor transaksinya tetap"
+          : "Catat dana masuk ke vihara"
+      }
+    >
       {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
 
       <form onSubmit={(e) => e.preventDefault()}>
         <Card>
           <CardHeader
-            title="Input Penerimaan Dana"
-            subtitle="Pilih yayasan dan vihara terlebih dahulu"
+            title={draftKode ? `Ubah Draft ${draftKode}` : "Input Penerimaan Dana"}
+            subtitle={
+              draftKode
+                ? "Yayasan dan Vihara draft tidak bisa dipindah"
+                : "Pilih yayasan dan vihara terlebih dahulu"
+            }
           />
           <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-2">
-            <YayasanViharaFields value={scope} onChange={setScope} disabled={pending !== null} />
+            <YayasanViharaFields
+              value={scope}
+              onChange={setScope}
+              disabled={pending !== null || draftId != null || memuatDraft}
+            />
             <Field label="Tanggal *">
               <Input
                 type="date"
@@ -387,7 +469,30 @@ export default function PenerimaanPage() {
             >
               <Input value={user?.name ?? "—"} disabled readOnly data-testid="form-diterima" />
             </Field>
-            <Field label="Lampiran Bukti" hint="PDF, JPG, atau PNG — maksimal 10 MB.">
+            <Field
+              label={draftLampiran ? "Ganti Lampiran Bukti" : "Lampiran Bukti"}
+              hint="PDF, JPG, atau PNG — maksimal 10 MB."
+            >
+              {draftLampiran && draftId != null && (
+                <p className="mb-1 text-[11px] text-km-ink-muted">
+                  Lampiran saat ini:{" "}
+                  <button
+                    type="button"
+                    data-testid="lampiran-draft"
+                    className="text-km-blue hover:underline"
+                    onClick={async () => {
+                      try {
+                        const blob = await fetchPenerimaanAttachment(draftId);
+                        window.open(URL.createObjectURL(blob), "_blank", "noopener");
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Gagal membuka lampiran");
+                      }
+                    }}
+                  >
+                    {draftLampiran.split("/").pop()}
+                  </button>
+                </p>
+              )}
               <input
                 ref={fileRef}
                 type="file"
@@ -426,10 +531,10 @@ export default function PenerimaanPage() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => resetForm()}
-              data-testid="tombol-reset"
+              onClick={() => (draftId != null ? router.push("/penerimaan/daftar") : resetForm())}
+              data-testid={draftId != null ? "tombol-batal" : "tombol-reset"}
             >
-              Reset
+              {draftId != null ? "Batal" : "Reset"}
             </Button>
             {bisaCatat && (
               <Button
@@ -439,7 +544,11 @@ export default function PenerimaanPage() {
                 onClick={() => simpan("draft")}
                 data-testid="tombol-draft"
               >
-                {pending === "draft" ? "Menyimpan…" : "Simpan sebagai Draft"}
+                {pending === "draft"
+                  ? "Menyimpan…"
+                  : draftId != null
+                    ? "Simpan Draft"
+                    : "Simpan sebagai Draft"}
               </Button>
             )}
             {bisaCatat && (
@@ -510,9 +619,9 @@ export default function PenerimaanPage() {
                 <Th>Kategori Dana</Th>
                 <Th>Metode</Th>
                 <Th>Masuk ke</Th>
-                <Th className="text-right">Jumlah</Th>
+                <Th className="whitespace-nowrap text-right">Jumlah</Th>
                 <Th>Status</Th>
-                <Th>Aksi</Th>
+                <ThAksi />
               </tr>
             </thead>
             <tbody>
@@ -550,7 +659,7 @@ export default function PenerimaanPage() {
                     <Td className="kode whitespace-nowrap text-[11px] text-km-ink-soft">
                       {r.bank_label ?? "Kas Penerimaan Langsung"}
                     </Td>
-                    <Td className="text-right font-medium tabular-nums text-km-green">
+                    <Td className="whitespace-nowrap text-right font-medium tabular-nums text-km-green">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
@@ -558,7 +667,7 @@ export default function PenerimaanPage() {
                         {STATUS_LABEL[r.status as PenerimaanStatus] ?? r.status}
                       </Badge>
                     </Td>
-                    <Td>
+                    <TdAksi>
                       <Button
                         size="sm"
                         variant="default"
@@ -568,7 +677,7 @@ export default function PenerimaanPage() {
                       >
                         Detail
                       </Button>
-                    </Td>
+                    </TdAksi>
                   </tr>
                 ))
               )}
@@ -586,18 +695,4 @@ export default function PenerimaanPage() {
       )}
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

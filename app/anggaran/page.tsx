@@ -2,6 +2,7 @@
 
 import { ReactNode, SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, Th } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag, danaCategoryLabel } from "@/components/DanaTag";
@@ -52,20 +53,6 @@ function ProgBar({ pct, fill }: { pct: number; fill: string }) {
       <span className="min-w-[32px] text-[11px] tabular-nums text-km-ink-muted">{pct}%</span>
     </div>
   );
-}
-
-function Th({ children, className = "" }: { children?: ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 align-middle text-km-ink ${className}`}>{children}</td>;
 }
 
 // Baris detail lokal — gabungan dari API + baris baru yang ditambah user.
@@ -286,7 +273,7 @@ export default function AnggaranPage() {
                             <span className="tabular-nums">{fmtRp(target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right tabular-nums font-medium text-km-green">
+                        <Td className="whitespace-nowrap text-right tabular-nums font-medium text-km-green">
                           {fmtRp(real)}
                         </Td>
                         <Td
@@ -353,7 +340,7 @@ export default function AnggaranPage() {
                             <span className="tabular-nums">{fmtRp(target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right tabular-nums font-medium text-km-red">
+                        <Td className="whitespace-nowrap text-right tabular-nums font-medium text-km-red">
                           {fmtRp(real)}
                         </Td>
                         <Td
@@ -446,7 +433,7 @@ export default function AnggaranPage() {
                             <span className="tabular-nums">{fmtRp(r.target)}</span>
                           )}
                         </Td>
-                        <Td className="text-right tabular-nums text-km-red">
+                        <Td className="whitespace-nowrap text-right tabular-nums text-km-red">
                           {r.realisasi ? fmtRp(r.realisasi) : "-"}
                         </Td>
                         <Td

@@ -11,6 +11,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { API_BASE, apiCall, apiToken, login, pickViharaVVG, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -45,7 +46,7 @@ test.describe("v11 pengeluaran", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("45000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByLabel("Transfer dari Rekening"), /BCA/);
+    await selectByLabelRegex(page.getByLabel("Transfer dari Rekening"), /Mandiri/);
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
     await page.getByTestId("tombol-submit").click();
 
@@ -90,7 +91,7 @@ test.describe("v11 pengeluaran", () => {
     await expect(page.getByText("Pilih rekening sumber dulu")).toBeVisible();
 
     // Begitu rekening dipilih, penahannya lepas.
-    await selectByLabelRegex(rekening, /BCA/);
+    await selectByLabelRegex(rekening, /Mandiri/);
     await expect(page.getByTestId("tombol-submit")).toBeEnabled();
   });
 
@@ -130,7 +131,7 @@ test.describe("v11 pengeluaran", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("77000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await selectByLabelRegex(page.getByTestId("form-rekening"), /Mandiri/);
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
     await page.getByTestId("tombol-submit").click();
     await expect(page.getByText(/disimpan dan disetujui/)).toBeVisible({ timeout: 10_000 });
@@ -162,7 +163,7 @@ test.describe("v11 pengeluaran", () => {
     await expect(baris).toBeVisible({ timeout: 10_000 });
     await expect(baris.locator("td").nth(0)).toContainText("PAY-");
     await expect(baris.locator("td").nth(2)).toContainText("Vipassan");
-    await expect(baris.locator("td").nth(6)).toContainText("BCA");
+    await expect(baris.locator("td").nth(6)).toContainText("Mandiri");
   });
 
   test("dropdown Nama Pengeluaran: urut tanpa bedakan besar-kecil, tanpa singkatan", async ({ page }) => {
@@ -227,13 +228,10 @@ test.describe("v11 pengeluaran", () => {
     const KHUSUS_VVG = "Biaya Keperluan SMB VVG";
     const token = await apiToken("bendaharaVbm");
 
-    // Rekening milik VBM sendiri, supaya yang diuji benar-benar namanya.
-    const rekening = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      token,
-      "/api/masters/vihara-bank-accounts",
-    );
-    const daftar = Array.isArray(rekening.body) ? rekening.body : (rekening.body.data ?? []);
-    expect(daftar.length).toBeGreaterThan(0);
+    // Rekening operasional yayasan VBM sendiri, supaya yang diuji benar-benar
+    // namanya — bukan aturan akun bank (FV-56) atau jangkauan vihara.
+    const viharaVbm = (await viharaIdsByCode()).VBM;
+    const rekVbm = await rekeningPengeluaran(token, viharaVbm);
 
     const res = await apiCall<{ message: string }>(token, "/api/pembayaran", {
       method: "POST",
@@ -243,7 +241,7 @@ test.describe("v11 pengeluaran", () => {
         category: "biaya_operasional",
         name: KHUSUS_VVG,
         amount: 5000,
-        bank_account_id: daftar[0].id,
+        bank_account_id: rekVbm,
       }),
     });
     expect(res.status).toBe(422);
@@ -276,7 +274,7 @@ test.describe("v11 pengeluaran", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("99000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await selectByLabelRegex(page.getByTestId("form-rekening"), /Mandiri/);
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
     await lampiran.setInputFiles({
       name: "kuitansi-uji.pdf",

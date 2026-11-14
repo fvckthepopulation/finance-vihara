@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
@@ -230,10 +231,10 @@ export default function DaftarPenerimaanPage() {
                 <Th>Kategori Dana</Th>
                 <Th>Masuk ke</Th>
                 <Th>Metode</Th>
-                <Th className="text-right">Jumlah</Th>
+                <Th className="whitespace-nowrap text-right">Jumlah</Th>
                 <Th>Status</Th>
                 <Th>Bukti</Th>
-                <Th>Aksi</Th>
+                <ThAksi />
               </tr>
             </thead>
             <tbody>
@@ -277,7 +278,7 @@ export default function DaftarPenerimaanPage() {
                     <Td className="whitespace-nowrap">
                       {METODE_LABEL[r.method] ?? r.method}
                     </Td>
-                    <Td className="text-right font-medium tabular-nums text-km-green">
+                    <Td className="whitespace-nowrap text-right font-medium tabular-nums text-km-green">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
@@ -294,7 +295,7 @@ export default function DaftarPenerimaanPage() {
                         <span className="text-km-ink-muted">—</span>
                       )}
                     </Td>
-                    <Td>
+                    <TdAksi>
                       <Button
                         size="sm"
                         variant="default"
@@ -304,7 +305,7 @@ export default function DaftarPenerimaanPage() {
                       >
                         Detail
                       </Button>
-                    </Td>
+                    </TdAksi>
                   </tr>
                 ))
               )}
@@ -330,18 +331,4 @@ export default function DaftarPenerimaanPage() {
       )}
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

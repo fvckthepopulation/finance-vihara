@@ -2,6 +2,7 @@
 
 import { SelectHTMLAttributes, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, Th } from "@/components/Tabel";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag } from "@/components/DanaTag";
 import { DanaUmatCategory, DanaUmatResponse, getDanaUmat } from "@/lib/danaUmat";
@@ -189,7 +190,7 @@ export default function DanaPage() {
                 <Th>Diterima oleh</Th>
                 <Th>Kategori Dana</Th>
                 <Th>Catatan</Th>
-                <Th className="text-right">Jumlah</Th>
+                <Th className="whitespace-nowrap text-right">Jumlah</Th>
               </tr>
             </thead>
             <tbody>
@@ -229,18 +230,4 @@ export default function DanaPage() {
       </Card>
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 align-middle text-km-ink ${className}`}>{children}</td>;
 }

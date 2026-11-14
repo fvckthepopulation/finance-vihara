@@ -9,6 +9,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -28,11 +29,8 @@ test.describe("v47 master penerima", () => {
   test.beforeAll(async () => {
     token = await apiToken("admin");
     viharaVvg = (await viharaIdsByCode()).VVG;
-    const rek = await apiCall<{ data: Array<{ id: number }> }>(
-      token,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}&type=bank`,
-    );
-    rekening = rek.body.data[0].id;
+    // Pengeluaran keluar dari Bank Operasional (1120) sejak FV-56.
+    rekening = await rekeningPengeluaran(token, viharaVvg);
   });
 
   test.afterAll(async () => {
@@ -102,7 +100,7 @@ test.describe("v47 master penerima", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("31000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await selectByLabelRegex(page.getByTestId("form-rekening"), /Mandiri/);
     await page.getByTestId("form-penerima").fill(vendor.slice(0, 8).toLowerCase());
     await expect(page.getByTestId("saran-penerima")).toBeVisible({ timeout: 15_000 });
     await page.getByTestId(`saran-penerima-${vendorId}`).click();

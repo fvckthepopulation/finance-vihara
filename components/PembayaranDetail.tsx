@@ -5,12 +5,13 @@ import {
   ModulTransaksi,
   TransaksiDetail,
 } from "@/components/TransaksiDetail";
-import { PembayaranDraftForm } from "@/components/PembayaranDraftForm";
 import {
   deletePembayaran,
   fetchPembayaranAttachment,
   getPembayaran,
   Pembayaran,
+  postPembayaran,
+  rejectPembayaran,
   submitPembayaran,
 } from "@/lib/pembayaran";
 import { danaCategoryLabel } from "@/components/DanaTag";
@@ -28,10 +29,13 @@ const fmtRp = (n: string | number) =>
 const MODUL: ModulTransaksi<Pembayaran> = {
   sebutan: "pengeluaran",
   izinCatat: "pembayaran.create",
+  izinSetujui: "pembayaran.approve",
   ambil: getPembayaran,
   lampiran: fetchPembayaranAttachment,
   hapus: deletePembayaran,
   ajukan: submitPembayaran,
+  setujui: postPembayaran,
+  tolak: (id, alasan) => rejectPembayaran(id, alasan),
   baris: (data): BarisDetail[] => [
     ["Yayasan", data.entity?.legal_name ?? "—"],
     ["Vihara", data.vihara?.name ?? "—"],
@@ -68,7 +72,7 @@ export function PembayaranDetail({
       id={id}
       onClose={onClose}
       onChanged={onChanged}
-      FormUbah={(props) => <PembayaranDraftForm {...props} />}
+      ubahHref={(row) => `/pembayaran?draft=${row.id}`}
     />
   );
 }

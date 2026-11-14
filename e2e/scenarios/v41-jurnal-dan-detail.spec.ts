@@ -9,6 +9,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -26,12 +27,8 @@ test.describe("v41 jurnal & detail", () => {
   test.beforeAll(async () => {
     token = await apiToken("admin");
     viharaVvg = (await viharaIdsByCode()).VVG;
-    const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      token,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}`,
-    );
-    const daftar = Array.isArray(rek.body) ? rek.body : (rek.body.data ?? []);
-    rekening = daftar[0].id;
+    // Rekening untuk PENGELUARAN harus berakun 1120 sejak FV-56.
+    rekening = await rekeningPengeluaran(token, viharaVvg);
   });
 
   test("FV-15: daftar pengeluaran punya Detail, isinya lengkap, lampiran terbuka", async ({
@@ -45,7 +42,7 @@ test.describe("v41 jurnal & detail", () => {
     await page.getByLabel("Jumlah (Rp) *").fill("88000");
     await selectByLabelRegex(page.getByLabel("Kategori Biaya *"), /Biaya Operasional/);
     await selectByLabelRegex(page.getByLabel("Nama Pengeluaran *"), /Biaya ATK/);
-    await selectByLabelRegex(page.getByTestId("form-rekening"), /BCA/);
+    await selectByLabelRegex(page.getByTestId("form-rekening"), /Mandiri/);
     await page.getByLabel("Dibayarkan kepada / PIC").fill("Toko Fotocopy");
     await page.getByLabel("No. Bukti / Referensi").fill(bukti);
     // PNG 1x1 yang sah, supaya cabang "tampilkan sebagai gambar" teruji.

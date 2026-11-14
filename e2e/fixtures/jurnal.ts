@@ -13,12 +13,14 @@ export type BarisJurnal = {
   account_code: string;
   debit: string;
   credit: string;
+  description?: string | null;
 };
 
 export type JurnalDetail = {
   id: number;
   vihara_id: number | null;
   status: string;
+  description?: string;
   total_debit: string;
   total_credit: string;
   lines: BarisJurnal[];
@@ -26,11 +28,19 @@ export type JurnalDetail = {
 
 /** Jurnal milik satu transaksi, dicari lewat kode dokumennya (PAY-…/RCV-…). */
 export async function jurnalDariKode(token: string, kode: string): Promise<JurnalDetail> {
-  const daftar = await apiCall<{ data: Array<{ id: number; description: string }> }>(
-    token,
-    `/api/journal-entries?q=${encodeURIComponent(kode)}&per_page=5`,
+  const daftar = await apiCall<{
+    data: Array<{ id: number; description: string; reference_type: string | null }>;
+  }>(token, `/api/journal-entries?q=${encodeURIComponent(kode)}&per_page=10`);
+
+  // Nomor transaksi kini muncul di lebih dari satu jurnal: jurnal transaksinya
+  // sendiri, jurnal pembaliknya, dan — sejak FV-55 — jurnal pelepasan
+  // pembatasan aset neto. Yang dicari jurnal TRANSAKSINYA, jadi dipilih
+  // berdasarkan reference_type, bukan sekadar deskripsi yang memuat kodenya.
+  const cocok = daftar.body.data.find(
+    (j) =>
+      j.description.includes(kode) &&
+      (j.reference_type === "pembayaran" || j.reference_type === "penerimaan"),
   );
-  const cocok = daftar.body.data.find((j) => j.description.includes(kode));
   if (!cocok) {
     throw new Error(`Jurnal untuk ${kode} tidak ditemukan`);
   }

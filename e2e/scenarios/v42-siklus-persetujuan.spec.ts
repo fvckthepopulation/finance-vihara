@@ -13,6 +13,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -41,12 +42,8 @@ test.describe("v42 siklus persetujuan", () => {
     tokenPencatat = await apiToken("bendahara"); // create tanpa approve
     tokenPenyetuju = await apiToken("approver"); // approve tanpa create
     viharaVvg = (await viharaIdsByCode()).VVG;
-    const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      tokenPencatat,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}`,
-    );
-    const daftar = Array.isArray(rek.body) ? rek.body : (rek.body.data ?? []);
-    rekening = daftar[0].id;
+    // Rekening untuk PENGELUARAN harus berakun 1120 sejak FV-56.
+    rekening = await rekeningPengeluaran(tokenPencatat, viharaVvg);
   });
 
   test("FV-20 & FV-24: tombol mengikuti izin, field Disetujui oleh hilang", async ({ page }) => {

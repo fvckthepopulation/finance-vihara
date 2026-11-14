@@ -95,8 +95,17 @@ export default function EntitiesPage() {
             </div>
             {canManage && (
               <div className="flex items-center justify-end gap-2 border-t border-km-border bg-km-panel-soft px-4 py-2">
-                <button onClick={() => setForm({ item: e })} className="text-[11px] text-km-blue hover:underline">Edit</button>
-                <button onClick={() => handleDelete(e)} className="text-[11px] text-km-red-ink hover:underline">Hapus</button>
+                <Button size="sm" className="min-h-[32px]" onClick={() => setForm({ item: e })}>
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="min-h-[32px]"
+                  onClick={() => handleDelete(e)}
+                >
+                  Hapus
+                </Button>
               </div>
             )}
           </Card>

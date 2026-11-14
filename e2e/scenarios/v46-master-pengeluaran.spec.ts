@@ -11,6 +11,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 import { selectByLabelRegex } from "../fixtures/select";
 import { uniq } from "../fixtures/uniq";
 
@@ -31,11 +32,8 @@ test.describe("v46 master pengeluaran", () => {
   test.beforeAll(async () => {
     token = await apiToken("admin");
     viharaVvg = (await viharaIdsByCode()).VVG;
-    const rek = await apiCall<{ data: Array<{ id: number }> }>(
-      token,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}&type=bank`,
-    );
-    rekening = rek.body.data[0].id;
+    // Pengeluaran keluar dari Bank Operasional (1120) sejak FV-56.
+    rekening = await rekeningPengeluaran(token, viharaVvg);
   });
 
   test.afterAll(async () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -116,7 +117,7 @@ export default function AdminViharaPage() {
               <Th>Rekening Bank</Th>
               <Th>PIC</Th>
               <Th>Status</Th>
-              <Th></Th>
+              <ThAksi />
             </tr>
           </thead>
           <tbody>
@@ -206,29 +207,26 @@ function ViharaRow({
             <Badge tone="warn">Unverified</Badge>
           )}
         </Td>
-        <Td className="text-right">
+        <TdAksi>
           {canVerify && v.active && !v.verified_at && (
-            <button onClick={onVerify} className="mr-2 text-[11px] text-km-green hover:underline">
+            <Button size="sm" variant="success" className="min-h-[32px]" onClick={onVerify}>
               Verify
-            </button>
+            </Button>
           )}
           {canManage && (
             <>
-              <button
-                onClick={onToggle}
-                className="mr-2 text-[11px] font-medium text-km-accent hover:underline"
-              >
+              <Button size="sm" className="min-h-[32px]" onClick={onToggle}>
                 {expanded ? "Tutup" : "Kelola"}
-              </button>
-              <button onClick={onEdit} className="mr-2 text-[11px] text-km-blue hover:underline">
+              </Button>
+              <Button size="sm" className="min-h-[32px]" onClick={onEdit}>
                 Edit
-              </button>
-              <button onClick={onDelete} className="text-[11px] text-km-red-ink hover:underline">
+              </Button>
+              <Button size="sm" variant="danger" className="min-h-[32px]" onClick={onDelete}>
                 Hapus
-              </button>
+              </Button>
             </>
           )}
-        </Td>
+        </TdAksi>
       </tr>
       {expanded && (
         <tr className="border-t border-km-border bg-km-panel-soft">
@@ -586,12 +584,4 @@ function ViharaForm({ item, onClose, onSaved }: { item: Vihara | null; onClose: 
     </Modal>
   );
 
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

@@ -40,10 +40,17 @@ export type ViharaBankAccount = {
 export const listViharaBankAccounts = (
   viharaId?: number | null,
   jenis?: JenisRekening,
+  /**
+   * Kategori biaya — server hanya mengembalikan rekening yang akunnya sah
+   * untuk kategori itu (FV-56). Aturannya tinggal di master, bukan di sini,
+   * supaya layar dan server tidak bisa berbeda pendapat.
+   */
+  kategori?: string,
 ) => {
   const sp = new URLSearchParams();
   if (viharaId != null) sp.set("vihara_id", String(viharaId));
   if (jenis) sp.set("type", jenis);
+  if (kategori) sp.set("kategori", kategori);
   return api<{ data: ViharaBankAccount[] }>(
     `/api/masters/vihara-bank-accounts${sp.toString() ? `?${sp}` : ""}`,
   ).then((r) => r.data);
@@ -166,7 +173,14 @@ export type KasBankMutasi = {
 export type KasBankData = {
   bank_accounts: KasBankAccount[];
   kas_kecil: { pics: { id: number; name: string; saldo: string | number }[]; total: string | number };
-  kas_tunai: string | number;
+  /**
+   * Kas tunai (1115) — kartu tersendiri sejak FV-52, dengan rincian per
+   * vihara karena uang tunai dipegang masing-masing vihara.
+   */
+  kas_tunai: {
+    total: string;
+    per_vihara: Array<{ vihara_id: number | null; vihara: string; saldo: string }>;
+  };
   mutasi: KasBankMutasi[];
 };
 

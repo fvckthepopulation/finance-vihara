@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { DanaTag } from "@/components/DanaTag";
 import { Field, Input, Select } from "@/components/Field";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
+import { PembayaranDetail } from "@/components/PembayaranDetail";
+import { PenerimaanDetail } from "@/components/PenerimaanDetail";
 import { Toast } from "@/components/Toast";
 import { postPembayaran, rejectPembayaran, STATUS_LABEL, STATUS_TONE, PembayaranStatus } from "@/lib/pembayaran";
 import { postPenerimaan, rejectPenerimaan } from "@/lib/penerimaan";
@@ -61,6 +64,12 @@ export default function PersetujuanPage() {
 
   const [f, setF] = useState({ ...KOSONG });
   const [rows, setRows] = useState<TransactionRow[]>([]);
+  // Detail dibuka dari antrean supaya approver bisa memeriksa isian dan
+  // lampiran sebelum memutuskan (FV-50). Komponennya sama dengan yang
+  // dipakai Daftar Pengeluaran/Penerimaan — bukan salinan.
+  const [detail, setDetail] = useState<{ tipe: TransactionRow["tipe"]; id: number } | null>(
+    null,
+  );
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
@@ -291,9 +300,9 @@ export default function PersetujuanPage() {
                 <Th>Keterangan</Th>
                 <Th>Kategori</Th>
                 <Th>Pengaju</Th>
-                <Th className="text-right">Jumlah</Th>
+                <Th className="whitespace-nowrap text-right">Jumlah</Th>
                 <Th>Status</Th>
-                <Th>Aksi</Th>
+                <ThAksi />
               </tr>
             </thead>
             <tbody>
@@ -346,7 +355,7 @@ export default function PersetujuanPage() {
                       <DanaTag category={r.category} label={r.category_label} />
                     </Td>
                     <Td className="whitespace-nowrap text-[11px]">{r.submitted_by ?? "—"}</Td>
-                    <Td className="text-right tabular-nums font-medium">
+                    <Td className="whitespace-nowrap text-right tabular-nums font-medium">
                       {fmtRp(r.amount)}
                     </Td>
                     <Td>
@@ -354,11 +363,20 @@ export default function PersetujuanPage() {
                         {STATUS_LABEL[r.status as PembayaranStatus] ?? r.status}
                       </Badge>
                     </Td>
-                    <Td>
+                    <TdAksi>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="min-h-[32px]"
+                        data-testid={`detail-antrean-${r.tipe}-${r.id}`}
+                        onClick={() => setDetail({ tipe: r.tipe, id: r.id })}
+                      >
+                        Detail
+                      </Button>
                       {r.status !== "submitted" ? (
                         <span className="text-[11px] text-km-ink-muted">—</span>
                       ) : bolehProses(r) ? (
-                        <div className="flex gap-2">
+                        <>
                           <Button
                             size="sm"
                             variant="success"
@@ -377,11 +395,11 @@ export default function PersetujuanPage() {
                           >
                             Tolak
                           </Button>
-                        </div>
+                        </>
                       ) : (
                         <span className="text-[11px] text-km-ink-muted">Bukan wewenang Anda</span>
                       )}
-                    </Td>
+                    </TdAksi>
                   </tr>
                 ))
               )}
@@ -401,20 +419,21 @@ export default function PersetujuanPage() {
           />
         </div>
       </Card>
+
+      {detail?.tipe === "Pengeluaran" && (
+        <PembayaranDetail
+          id={detail.id}
+          onClose={() => setDetail(null)}
+          onChanged={reload}
+        />
+      )}
+      {detail?.tipe === "Penerimaan" && (
+        <PenerimaanDetail
+          id={detail.id}
+          onClose={() => setDetail(null)}
+          onChanged={reload}
+        />
+      )}
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

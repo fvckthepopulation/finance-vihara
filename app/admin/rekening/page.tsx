@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
@@ -199,7 +200,7 @@ export default function MasterRekeningPage_() {
                 <Th>Atas Nama</Th>
                 <Th>Akun COA</Th>
                 <Th>Status</Th>
-                <Th>Aksi</Th>
+                <ThAksi />
               </tr>
             </thead>
             <tbody>
@@ -252,9 +253,9 @@ export default function MasterRekeningPage_() {
                         <Badge tone="neutral">Nonaktif</Badge>
                       )}
                     </Td>
-                    <Td>
+                    <TdAksi>
                       {bisaKelola ? (
-                        <div className="flex flex-wrap gap-1.5">
+                        <>
                           <Button
                             size="sm"
                             className="min-h-[32px]"
@@ -284,11 +285,11 @@ export default function MasterRekeningPage_() {
                               Hapus
                             </Button>
                           )}
-                        </div>
+                        </>
                       ) : (
                         <span className="text-[11px] text-km-ink-muted">—</span>
                       )}
-                    </Td>
+                    </TdAksi>
                   </tr>
                 ))
               )}
@@ -540,18 +541,4 @@ function RekeningForm({
       </div>
     </Modal>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

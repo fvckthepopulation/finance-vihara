@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, MoneyInput, Select } from "@/components/Field";
@@ -11,6 +12,7 @@ import { bankBrand, listViharaBankAccounts, num, ViharaBankAccount } from "@/lib
 import {
   createPettyCash,
   getPettyCashSummary,
+  KATEGORI_KAS_KECIL,
   listPettyCashPaginated,
   listPettyCashPics,
   pettyCashDate,
@@ -205,15 +207,30 @@ export default function PettyCashPage() {
                 <div className="grid grid-cols-2 gap-4 px-4 py-3.5">
                   <div>
                     <p className="mb-1 text-[11px] text-km-ink-muted">Saldo Awal</p>
-                    <p className="text-[18px] font-medium text-km-ink">{fmtRp(num(p.saldo_awal))}</p>
+                    <p className="text-[18px] font-medium text-km-ink" data-testid={`saldo-awal-${p.id}`}>
+                      {fmtRp(num(p.saldo_awal))}
+                    </p>
                   </div>
                   <div>
                     <p className="mb-1 text-[11px] text-km-ink-muted">Saldo Saat Ini</p>
-                    <p className="text-[18px] font-semibold text-km-green">{fmtRp(num(p.saldo))}</p>
+                    {/* Saldo minus merah, bukan hijau (FV-60 poin 4) — hijau
+                        untuk angka minus membuatnya terbaca sebagai keadaan
+                        baik-baik saja. */}
+                    <p
+                      data-testid={`saldo-kini-${p.id}`}
+                      className={`text-[18px] font-semibold ${
+                        num(p.saldo) < 0 ? "text-km-red" : "text-km-green"
+                      }`}
+                    >
+                      {fmtRp(num(p.saldo))}
+                    </p>
+                    {num(p.saldo) < 0 && (
+                      <p className="text-[11px] font-medium text-km-red-ink">Saldo minus</p>
+                    )}
                   </div>
                 </div>
                 <p className="px-4 pb-3.5 text-[11px] text-km-ink-muted">
-                  Total pengisian: {fmtRp(num(p.total_isi))} | Terpakai: {fmtRp(num(p.total_pakai))} | {p.count} mutasi
+                  Pengisian bulan ini: {fmtRp(num(p.total_isi))} | Terpakai: {fmtRp(num(p.total_pakai))} | {p.count} mutasi
                 </p>
               </Card>
             );
@@ -287,21 +304,23 @@ export default function PettyCashPage() {
                   <Th>Tanggal</Th>
                   <Th>PIC</Th>
                   <Th>Keterangan</Th>
+                  {/* Kategori keperluan + akun bebannya (FV-58 poin 3). */}
+                  <Th>Kategori</Th>
                   <Th>Tipe</Th>
                   <Th className="text-right">Masuk</Th>
                   <Th className="text-right">Keluar</Th>
                   <Th>No. Bukti</Th>
-                  <Th>Aksi</Th>
+                  <ThAksi />
                 </tr>
               </thead>
               <tbody>
                 {rowsLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
+                    <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-km-ink-muted">
+                    <td colSpan={9} className="px-3 py-8 text-center text-km-ink-muted">
                       {cari || filterPic ? "Data tidak ditemukan" : "Belum ada mutasi kas kecil"}
                     </td>
                   </tr>
@@ -330,6 +349,20 @@ export default function PettyCashPage() {
                                 : "Pengisian"
                               : "—")}
                         </Td>
+                        <Td className="whitespace-nowrap text-[11px]">
+                          {r.category ? (
+                            <>
+                              {KATEGORI_KAS_KECIL[r.category]?.label ?? r.category}
+                              <span className="ml-1 kode text-km-ink-muted">
+                                {r.counterpart_account_code ??
+                                  KATEGORI_KAS_KECIL[r.category]?.akun ??
+                                  ""}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-km-ink-muted">—</span>
+                          )}
+                        </Td>
                         <Td>
                           <span className="flex items-center gap-1.5">
                             {isTopup ? (
@@ -356,14 +389,14 @@ export default function PettyCashPage() {
                             )}
                           </span>
                         </Td>
-                        <Td className="text-right tabular-nums text-km-green">
+                        <Td className="whitespace-nowrap text-right tabular-nums text-km-green">
                           {isTopup ? fmtRp(amount) : "—"}
                         </Td>
-                        <Td className="text-right tabular-nums text-km-red">
+                        <Td className="whitespace-nowrap text-right tabular-nums text-km-red">
                           {!isTopup ? fmtRp(amount) : "—"}
                         </Td>
                         <Td className="text-[11px] text-km-ink-muted">{r.reference || "—"}</Td>
-                        <Td>
+                        <TdAksi>
                           {canVoid && r.status === "posted" ? (
                             <button
                               type="button"
@@ -376,7 +409,7 @@ export default function PettyCashPage() {
                           ) : (
                             <span className="text-[11px] text-km-ink-muted">—</span>
                           )}
-                        </Td>
+                        </TdAksi>
                       </tr>
                     );
                   })
@@ -547,6 +580,7 @@ function UsageForm({
   const [date, setDate] = useState(today());
   const [picId, setPicId] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [kategori, setKategori] = useState("");
   const [amount, setAmount] = useState(0);
   const [reference, setReference] = useState("");
   const [pending, setPending] = useState(false);
@@ -565,6 +599,7 @@ function UsageForm({
         pic_id: Number(picId),
         subtype: "usage",
         amount,
+        category: kategori,
         ...(reference ? { reference } : {}),
         ...(purpose ? { description: purpose } : {}),
         ...(fixed ? {} : { vihara_id: viharaId! }),
@@ -603,6 +638,30 @@ function UsageForm({
               ))}
             </Select>
           </Field>
+          {/* Kategori menentukan akun beban jurnalnya (FV-58): keperluan
+              Bhikkhu mendarat di 5100, bukan di Beban Lainnya. */}
+          <Field
+            label="Kategori Keperluan *"
+            hint={
+              kategori
+                ? `Dijurnal ke akun ${KATEGORI_KAS_KECIL[kategori]?.akun ?? "—"}.`
+                : undefined
+            }
+          >
+            <Select
+              required
+              data-testid="kaskecil-kategori"
+              value={kategori}
+              onChange={(e) => setKategori(e.target.value)}
+            >
+              <option value="">— Pilih kategori keperluan —</option>
+              {Object.entries(KATEGORI_KAS_KECIL).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Keperluan">
             <Input
               required
@@ -631,15 +690,4 @@ function UsageForm({
       </Card>
     </form>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return (
-    <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>
-      {children}
-    </th>
-  );
-}
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`}>{children}</td>;
 }

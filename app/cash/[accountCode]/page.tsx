@@ -9,6 +9,7 @@ import {
 } from "@/lib/cash";
 import { formatIDR } from "@/lib/shared";
 import { AppShell } from "@/components/AppShell";
+import { Td, Th } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, Select } from "@/components/Field";
@@ -136,9 +137,9 @@ export default function BankBookPage({
                       <Th>Tanggal</Th>
                       <Th>Keterangan</Th>
                       <Th>Referensi</Th>
-                      <Th className="text-right">Masuk</Th>
-                      <Th className="text-right">Keluar</Th>
-                      <Th className="text-right">Saldo</Th>
+                      <Th className="whitespace-nowrap text-right">Masuk</Th>
+                      <Th className="whitespace-nowrap text-right">Keluar</Th>
+                      <Th className="whitespace-nowrap text-right">Saldo</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -179,10 +180,10 @@ export default function BankBookPage({
                               </Badge>
                             ) : "—"}
                           </Td>
-                          <Td className="text-right">
+                          <Td className="whitespace-nowrap text-right tabular-nums">
                             {r.debit > 0 ? <span className="text-km-teal-ink font-medium">{formatIDR(r.debit)}</span> : "—"}
                           </Td>
-                          <Td className="text-right">
+                          <Td className="whitespace-nowrap text-right tabular-nums">
                             {r.credit > 0 ? <span className="text-km-red-ink font-medium">{formatIDR(r.credit)}</span> : "—"}
                           </Td>
                           <Td className={`text-right font-semibold ${r.running_balance < 0 ? "text-km-red-ink" : ""}`}>
@@ -197,9 +198,9 @@ export default function BankBookPage({
                       <Td colSpan={4} className="text-[11px] uppercase text-km-ink-muted">
                         Total movement
                       </Td>
-                      <Td className="text-right">{formatIDR(data.totals.debit)}</Td>
-                      <Td className="text-right">{formatIDR(data.totals.credit)}</Td>
-                      <Td className="text-right">{formatIDR(data.closing_balance)}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{formatIDR(data.totals.debit)}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{formatIDR(data.totals.credit)}</Td>
+                      <Td className="whitespace-nowrap text-right tabular-nums">{formatIDR(data.closing_balance)}</Td>
                     </tr>
                   </tfoot>
                 </table>
@@ -210,12 +211,4 @@ export default function BankBookPage({
       </div>
     </AppShell>
   );
-}
-
-function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-km-ink-muted ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "", colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) {
-  return <td className={`px-3 py-2.5 text-km-ink ${className}`} colSpan={colSpan}>{children}</td>;
 }

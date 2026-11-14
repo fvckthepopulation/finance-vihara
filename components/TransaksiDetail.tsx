@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { STATUS_LABEL, StatusTransaksi, bisaDilanjutkan } from "@/lib/statusTransaksi";
@@ -51,19 +52,16 @@ export type ModulTransaksi<T extends BarisTransaksi> = {
   sebutan: string;
   /** Izin mencatat — tanpa ini tombol lanjut draft tidak relevan. */
   izinCatat: string;
+  /** Izin menyetujui — tombol Setujui/Tolak di detail (FV-50 poin 4). */
+  izinSetujui: string;
   ambil: (id: number) => Promise<T>;
   lampiran: (id: number) => Promise<Blob>;
   hapus: (id: number) => Promise<void>;
   ajukan: (id: number) => Promise<unknown>;
+  setujui: (id: number) => Promise<unknown>;
+  tolak: (id: number, alasan: string) => Promise<unknown>;
   /** Baris isian yang ditampilkan, urutannya mengikuti form inputnya. */
   baris: (row: T) => BarisDetail[];
-};
-
-/** Form ubah draft — dipasok per modul, karena fieldnya memang berbeda. */
-export type FormUbahProps<T> = {
-  row: T;
-  onClose: () => void;
-  onSaved: (pesan: string) => void;
 };
 
 export function TransaksiDetail<T extends BarisTransaksi>({
@@ -71,15 +69,22 @@ export function TransaksiDetail<T extends BarisTransaksi>({
   id,
   onClose,
   onChanged,
-  FormUbah,
+  ubahHref,
 }: {
   modul: ModulTransaksi<T>;
   id: number;
   onClose: () => void;
   /** Dipanggil setiap draft berubah, supaya daftar pemanggil ikut segar. */
   onChanged?: () => void;
-  FormUbah?: (props: FormUbahProps<T>) => React.ReactNode;
+  /**
+   * Alamat form ubah draft. Sejak FV-46 draft dilanjutkan di FORM INPUT yang
+   * biasa, bukan modal tersendiri: modalnya sempat menyimpang dari form
+   * aslinya (field Metode hilang, tanda wajib tidak lengkap), dan itu persis
+   * risiko yang dikeluhkan — draft bisa diajukan dalam keadaan tidak lengkap.
+   */
+  ubahHref?: (row: T) => string;
 }) {
+  const router = useRouter();
   const { user, can, hasRole } = useAuth();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +92,7 @@ export function TransaksiDetail<T extends BarisTransaksi>({
   const [lampiranUrl, setLampiranUrl] = useState<string | null>(null);
   const [lampiranTipe, setLampiranTipe] = useState<string | null>(null);
   const [memuatLampiran, setMemuatLampiran] = useState(false);
-  const [sedang, setSedang] = useState<null | "ajukan" | "hapus">(null);
-  const [ubah, setUbah] = useState(false);
+  const [sedang, setSedang] = useState<null | "ajukan" | "hapus" | "setujui" | "tolak">(null);
 
   const muat = useCallback(() => {
     return modul
@@ -177,6 +181,51 @@ export function TransaksiDetail<T extends BarisTransaksi>({
     }
   }
 
+  // Approver memutuskan langsung dari detail, sesudah melihat isian dan
+  // lampirannya — itulah inti FV-50: persetujuan tidak lagi diberikan hanya
+  // dari ringkasan di tabel.
+  const bolehSetujui = data != null && data.status === "submitted" && can(modul.izinSetujui);
+
+  async function setujui() {
+    if (!data) return;
+    setError(null);
+    setSedang("setujui");
+    try {
+      await modul.setujui(data.id);
+      setInfo(`${ucfirst(modul.sebutan)} ${data.code} disetujui`);
+      await muat();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal menyetujui");
+    } finally {
+      setSedang(null);
+    }
+  }
+
+  async function tolak() {
+    if (!data) return;
+    const alasan = window.prompt(
+      `Tolak ${data.code}?\n\nTransaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
+    );
+    if (alasan === null) return;
+    if (alasan.trim().length < 3) {
+      setError("Alasan penolakan terlalu singkat.");
+      return;
+    }
+    setError(null);
+    setSedang("tolak");
+    try {
+      await modul.tolak(data.id, alasan.trim());
+      setInfo(`${ucfirst(modul.sebutan)} ${data.code} ditolak`);
+      await muat();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal menolak");
+    } finally {
+      setSedang(null);
+    }
+  }
+
   async function hapus() {
     if (!data) return;
     const ya = window.confirm(
@@ -198,23 +247,6 @@ export function TransaksiDetail<T extends BarisTransaksi>({
 
   const baris = data ? modul.baris(data) : [];
 
-  if (ubah && data && FormUbah) {
-    return (
-      <>
-        {FormUbah({
-          row: data,
-          onClose: () => setUbah(false),
-          onSaved: async (pesan: string) => {
-            setUbah(false);
-            setInfo(pesan);
-            await muat();
-            onChanged?.();
-          },
-        })}
-      </>
-    );
-  }
-
   return (
     <Modal
       title={data ? `Detail ${data.code}` : `Detail ${modul.sebutan}`}
@@ -228,12 +260,12 @@ export function TransaksiDetail<T extends BarisTransaksi>({
               Draft milik Anda — masih bisa diubah.
             </span>
           )}
-          {bolehLanjut && FormUbah && (
+          {bolehLanjut && ubahHref && (
             <Button
               type="button"
               variant="default"
               disabled={sedang !== null}
-              onClick={() => setUbah(true)}
+              onClick={() => router.push(ubahHref(data))}
               data-testid="ubah-draft"
             >
               Ubah
@@ -259,6 +291,28 @@ export function TransaksiDetail<T extends BarisTransaksi>({
               data-testid="ajukan-draft"
             >
               {sedang === "ajukan" ? "Mengajukan…" : "Ajukan Persetujuan"}
+            </Button>
+          )}
+          {bolehSetujui && (
+            <Button
+              type="button"
+              variant="success"
+              disabled={sedang !== null}
+              onClick={setujui}
+              data-testid="setujui-detail"
+            >
+              {sedang === "setujui" ? "Menyetujui…" : "Setujui"}
+            </Button>
+          )}
+          {bolehSetujui && (
+            <Button
+              type="button"
+              variant="default"
+              disabled={sedang !== null}
+              onClick={tolak}
+              data-testid="tolak-detail"
+            >
+              {sedang === "tolak" ? "Menolak…" : "Tolak"}
             </Button>
           )}
           <Button type="button" variant="default" onClick={onClose}>

@@ -39,10 +39,43 @@ export type Halaman<T> = {
   to: number | null;
 };
 
+/** Jenis pembatasan ISAK 35 untuk Kategori Dana (FV-49). */
+export type JenisPembatasan = "tp" | "dp" | "suspense";
+
+export const LABEL_PEMBATASAN: Record<JenisPembatasan, string> = {
+  tp: "Tanpa Pembatasan",
+  dp: "Dengan Pembatasan",
+  suspense: "Belum Teridentifikasi",
+};
+
+/** Akun pendapatan per kanal penerimaan; null untuk kategori pengeluaran. */
+export type AkunPerMetode = {
+  auto_credit: string | null;
+  transfer: string | null;
+  tunai: string | null;
+} | null;
+
+/**
+ * "KM 4120 · Transfer 4220 · Tunai 4320" — dipakai layar master supaya admin
+ * bisa MELIHAT akun yang akan dipakai, bukan "—" (FV-49 poin 2).
+ * Kalau ketiganya sama (kategori suspense), cukup ditulis sekali.
+ */
+export function ringkasAkunPerMetode(akun: AkunPerMetode): string {
+  if (!akun) return "—";
+  const { auto_credit: km, transfer, tunai } = akun;
+  if (!km && !transfer && !tunai) return "—";
+  if (km === transfer && transfer === tunai) return km ?? "—";
+  return `KM ${km ?? "—"} · Transfer ${transfer ?? "—"} · Tunai ${tunai ?? "—"}`;
+}
+
 export type KategoriTransaksi = {
   id: number;
   code: string;
   name: string;
+  /** Hanya kategori dana; null untuk pengeluaran. */
+  restriction: JenisPembatasan | null;
+  restriction_label: string | null;
+  akun_per_metode: AkunPerMetode;
   description: string | null;
   /**
    * Akun bawaan kategori. Namanya warisan master pengeluaran; bacalah sebagai
@@ -64,6 +97,8 @@ export type NamaTransaksi = {
   name: string;
   coa_account_code: string | null;
   coa_account_name: string | null;
+  /** Diwarisi dari kategorinya (penerimaan); null untuk pengeluaran. */
+  akun_per_metode?: AkunPerMetode;
   description: string | null;
   vihara_id: number | null;
   vihara_name: string | null;
@@ -94,6 +129,8 @@ export const listKategori = (jenis: JenisMaster, p: FilterDaftar = {}) =>
 export type KategoriInput = {
   code: string;
   name: string;
+  /** Wajib untuk Kategori Dana (FV-49). */
+  restriction?: JenisPembatasan | null;
   description?: string | null;
   default_debit_code?: string | null;
 };
@@ -109,6 +146,7 @@ export const updateKategori = (
   id: number,
   payload: Partial<{
     name: string;
+    restriction: JenisPembatasan | null;
     description: string | null;
     default_debit_code: string | null;
     active: boolean;

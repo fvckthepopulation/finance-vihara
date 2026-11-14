@@ -5,13 +5,14 @@ import {
   ModulTransaksi,
   TransaksiDetail,
 } from "@/components/TransaksiDetail";
-import { PenerimaanDraftForm } from "@/components/PenerimaanDraftForm";
 import { danaCategoryLabel } from "@/components/DanaTag";
 import {
   deletePenerimaan,
   fetchPenerimaanAttachment,
   getPenerimaan,
   Penerimaan,
+  postPenerimaan,
+  rejectPenerimaan,
   submitPenerimaan,
 } from "@/lib/penerimaan";
 import { fmtTanggal } from "@/lib/tanggal";
@@ -34,10 +35,13 @@ const METODE: Record<string, string> = {
 const MODUL: ModulTransaksi<Penerimaan> = {
   sebutan: "penerimaan",
   izinCatat: "penerimaan.create",
+  izinSetujui: "penerimaan.approve",
   ambil: getPenerimaan,
   lampiran: fetchPenerimaanAttachment,
   hapus: deletePenerimaan,
   ajukan: submitPenerimaan,
+  setujui: postPenerimaan,
+  tolak: (id, alasan) => rejectPenerimaan(id, alasan),
   baris: (data): BarisDetail[] => [
     ["Yayasan", data.entity?.legal_name ?? "—"],
     ["Vihara", data.vihara?.name ?? "—"],
@@ -74,7 +78,7 @@ export function PenerimaanDetail({
       id={id}
       onClose={onClose}
       onChanged={onChanged}
-      FormUbah={(props) => <PenerimaanDraftForm {...props} />}
+      ubahHref={(row) => `/penerimaan?draft=${row.id}`}
     />
   );
 }

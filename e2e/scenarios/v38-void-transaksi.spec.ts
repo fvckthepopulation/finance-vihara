@@ -11,6 +11,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { apiCall, apiToken, login, viharaIdsByCode } from "../fixtures/auth";
+import { rekeningPengeluaran } from "../fixtures/rekening";
 
 type Dibuat = { id: number; code: string };
 type Baris = {
@@ -32,12 +33,8 @@ test.describe("v38 pembatalan transaksi", () => {
   test.beforeAll(async () => {
     token = await apiToken("admin");
     viharaVvg = (await viharaIdsByCode()).VVG;
-    const rek = await apiCall<{ data?: Array<{ id: number }> } | Array<{ id: number }>>(
-      token,
-      `/api/masters/vihara-bank-accounts?vihara_id=${viharaVvg}`,
-    );
-    const daftar = Array.isArray(rek.body) ? rek.body : (rek.body.data ?? []);
-    rekening = daftar[0].id;
+    // Rekening untuk PENGELUARAN harus berakun 1120 sejak FV-56.
+    rekening = await rekeningPengeluaran(token, viharaVvg);
   });
 
   async function buatPengeluaran(amount: number) {
