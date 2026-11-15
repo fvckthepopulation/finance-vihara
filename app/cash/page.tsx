@@ -17,6 +17,7 @@ import {
   getReconciliationSummary,
 } from "@/lib/reconciliation";
 import { useVihara } from "@/lib/useVihara";
+import { journalSourceLabel } from "@/lib/journal";
 
 const fmtRp = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 const fmtTgl = (iso: string) =>
@@ -35,7 +36,8 @@ export default function KasBankPage() {
   const [data, setData] = useState<KasBankData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Filter mutasi: "" = semua rekening; angka = bank_account_id.
+  // Filter mutasi: "" = semua rekening; angka = bank_account_id;
+  // "tunai" / "kaskecil" = mutasi kartu Kas Tunai / Kas Kecil.
   const [filterRek, setFilterRek] = useState("");
   // Ringkasan rekonsiliasi per rekening (banks[] dari GET /api/reconciliation).
   const [reconBanks, setReconBanks] = useState<ReconciliationBankSummary[]>([]);
@@ -108,10 +110,11 @@ export default function KasBankPage() {
     return rows.filter((m) => m.bank_account_id === id);
   }, [data, filterRek]);
 
-  function showMutasi(bankAccountId: number) {
-    setFilterRek(String(bankAccountId));
+  function showMutasi(sumber: number | "tunai" | "kaskecil") {
+    setFilterRek(String(sumber));
     mutasiRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  const sumberKas = filterRek === "tunai" || filterRek === "kaskecil" ? filterRek : null;
 
   return (
     <AppShell
@@ -292,6 +295,17 @@ export default function KasBankPage() {
                 Disetor ke bank lewat Rekonsiliasi, dari baris rekening koran.
               </p>
             </div>
+            <div className="px-4 py-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-center"
+                onClick={() => showMutasi("tunai")}
+                data-testid="mutasi-kas-tunai"
+              >
+                Mutasi
+              </Button>
+            </div>
           </Card>
 
           {/* Kartu Kas Kecil */}
@@ -331,9 +345,17 @@ export default function KasBankPage() {
               </p>
 
             </div>
-            <div className="px-4 py-2">
-              <Button size="sm" className="w-full justify-center" onClick={() => router.push("/petty-cash")}>
+            <div className="flex gap-1.5 px-4 py-2">
+              <Button size="sm" className="flex-1 justify-center" onClick={() => router.push("/petty-cash")}>
                 Kelola Kas Kecil →
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => showMutasi("kaskecil")}
+                data-testid="mutasi-kas-kecil"
+              >
+                Mutasi
               </Button>
             </div>
           </Card>
@@ -351,8 +373,20 @@ export default function KasBankPage() {
         <div ref={mutasiRef}>
           <Card>
             <CardHeader
-              title="Mutasi Transaksi Bank"
-              subtitle="Penerimaan & pengeluaran via bank/transfer"
+              title={
+                sumberKas === "tunai"
+                  ? "Mutasi Kas Tunai"
+                  : sumberKas === "kaskecil"
+                    ? "Mutasi Kas Kecil"
+                    : "Mutasi Transaksi Bank"
+              }
+              subtitle={
+                sumberKas === "tunai"
+                  ? `Buku besar akun 1115 · ${data?.mutasi_kas_tunai?.length ?? 0} mutasi terakhir`
+                  : sumberKas === "kaskecil"
+                    ? `Pengisian & pemakaian kas kecil per PIC · ${data?.mutasi_kas_kecil?.length ?? 0} mutasi terakhir`
+                    : "Penerimaan & pengeluaran via bank/transfer"
+              }
               right={
                 <Select
                   value={filterRek}
@@ -366,9 +400,14 @@ export default function KasBankPage() {
                       {bankShortLabel(a)}
                     </option>
                   ))}
+                  <option value="tunai">Kas Tunai (1115)</option>
+                  <option value="kaskecil">Kas Kecil ({data?.kas_kecil.akun?.code ?? "1110"})</option>
                 </Select>
               }
             />
+            {sumberKas ? (
+              <MutasiKas sumber={sumberKas} data={data} loading={loading} />
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-[12px]">
                 <thead className="bg-km-panel-soft">
@@ -430,9 +469,98 @@ export default function KasBankPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </Card>
         </div>
       </div>
     </AppShell>
+  );
+}
+
+/**
+ * Tabel mutasi kartu Kas Tunai / Kas Kecil. Datanya dari sumber yang sama
+ * dengan saldo kartunya, jadi jumlah masuk − keluar seluruh riwayat = saldo.
+ */
+function MutasiKas({
+  sumber,
+  data,
+  loading,
+}: {
+  sumber: "tunai" | "kaskecil";
+  data: KasBankData | null;
+  loading: boolean;
+}) {
+  const tunai = sumber === "tunai";
+  const rows = (tunai ? data?.mutasi_kas_tunai : data?.mutasi_kas_kecil) ?? [];
+  const pill = "inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium";
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[12px]" data-testid={`tabel-mutasi-${sumber}`}>
+        <thead className="bg-km-panel-soft">
+          <tr>
+            <Th>Tanggal</Th>
+            <Th>Keterangan</Th>
+            <Th>{tunai ? "Vihara" : "PIC"}</Th>
+            <Th>{tunai ? "Sumber" : "Jenis"}</Th>
+            <Th className="whitespace-nowrap text-right">Masuk</Th>
+            <Th className="whitespace-nowrap text-right">Keluar</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr>
+              <td colSpan={6} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
+            </tr>
+          ) : rows.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="px-3 py-8 text-center text-km-ink-muted">
+                {tunai ? "Belum ada mutasi kas tunai" : "Belum ada mutasi kas kecil"}
+              </td>
+            </tr>
+          ) : (
+            rows.map((m, i) => {
+              const masuk = num(m.masuk);
+              const keluar = num(m.keluar);
+              const t = tunai ? (m as NonNullable<KasBankData["mutasi_kas_tunai"]>[number]) : null;
+              const k = tunai ? null : (m as NonNullable<KasBankData["mutasi_kas_kecil"]>[number]);
+              return (
+                <tr key={i} className="border-t border-km-border hover:bg-km-panel-soft">
+                  <Td className="whitespace-nowrap">{fmtTgl(m.date)}</Td>
+                  <Td>
+                    {m.name}
+                    {(t?.kode || k?.reference) && (
+                      <span className="block text-[10.5px] text-km-ink-muted">{t?.kode ?? k?.reference}</span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap">{t ? t.vihara : (k?.pic ?? "—")}</Td>
+                  <Td>
+                    {t ? (
+                      <span className="flex flex-wrap gap-1">
+                        <span className={`${pill} border border-km-border bg-km-bg text-km-ink-muted`}>
+                          {t.pembalik ? "Pembalik" : journalSourceLabel(t.sumber)}
+                        </span>
+                        {t.dibatalkan && (
+                          <span className={`${pill} bg-km-red-soft text-km-red-ink`}>Dibatalkan</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className={`${pill} ${masuk > 0 ? "bg-km-green-soft text-km-green" : "bg-km-red-soft text-km-red"}`}>
+                        {k?.jenis}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums text-km-green">
+                    {masuk > 0 ? fmtRp(masuk) : "—"}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums text-km-red">
+                    {keluar > 0 ? fmtRp(keluar) : "—"}
+                  </Td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }

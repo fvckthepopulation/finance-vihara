@@ -187,6 +187,39 @@ export type KasBankData = {
     per_vihara: Array<{ vihara_id: number | null; vihara: string; saldo: string }>;
   };
   mutasi: KasBankMutasi[];
+  /** Mutasi Kas Tunai (1115) dari buku besar — sumber yang sama dengan saldonya. */
+  mutasi_kas_tunai?: KasTunaiMutasi[];
+  /** Mutasi Kas Kecil per PIC — sumber yang sama dengan saldonya. */
+  mutasi_kas_kecil?: KasKecilMutasi[];
+};
+
+export type KasTunaiMutasi = {
+  date: string;
+  name: string;
+  je_id: number;
+  /** No. transaksi sumber (PAY-/RCV-), null untuk jurnal manual. */
+  kode: string | null;
+  /** reference_type jurnal, mis. penerimaan, manual, penerimaan_void. */
+  sumber: string;
+  vihara: string;
+  /** Jurnal yang dibatalkan — tetap tercatat, diimbangi pembaliknya. */
+  dibatalkan: boolean;
+  /** Jurnal pembalik dari sebuah pembatalan. */
+  pembalik: boolean;
+  masuk: string | null;
+  keluar: string | null;
+};
+
+export type KasKecilMutasi = {
+  id: number;
+  date: string;
+  name: string;
+  jenis: "Pengisian" | "Pemakaian";
+  pic: string;
+  vihara: string | null;
+  reference: string | null;
+  masuk: string | null;
+  keluar: string | null;
 };
 
 export const getKasBank = (params: { vihara_id?: number | null; bank_account_id?: number } = {}) => {
