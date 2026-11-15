@@ -177,8 +177,10 @@ test.describe("v38 pembatalan transaksi", () => {
     const tombol = page.getByTestId(`batalkan-Pengeluaran-${t.id}`);
     await expect(tombol).toBeVisible({ timeout: 10_000 });
 
-    page.once("dialog", (d) => d.accept("Dibatalkan lewat UI"));
     await tombol.click();
+    // FV-70: alasan diisi di dialog aplikasi, bukan window.prompt.
+    await page.getByTestId("dialog-isian").fill("Dibatalkan lewat UI");
+    await page.getByTestId("dialog-konfirmasi").click();
 
     const badge = page.getByTestId(`status-cancelled-${t.id}`);
     await expect(badge).toBeVisible({ timeout: 10_000 });

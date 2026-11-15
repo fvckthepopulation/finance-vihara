@@ -226,6 +226,18 @@ const SECTIONS: NavSection[] = [
           </svg>
         ),
       },
+      // Dipindah dari kelompok Admin (FV-71): halamannya terutama untuk
+      // melihat & mengunduh seluruh jurnal, lebih dekat ke laporan.
+      {
+        href: "/jurnal",
+        label: "Jurnal & Buku Besar",
+        permission: "journal.view",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M2 3h12v10H2zM5 3v10M2 7h12" />
+          </svg>
+        ),
+      },
       {
         href: "/cetak",
         label: "Laporan Penerimaan Dana",
@@ -269,16 +281,6 @@ const SECTIONS: NavSection[] = [
   {
     title: "Admin",
     items: [
-      {
-        href: "/jurnal",
-        label: "Jurnal Manual",
-        permission: "journal.view",
-        icon: (
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 3h12v10H2zM5 3v10M2 7h12" />
-          </svg>
-        ),
-      },
       {
         href: "/admin/coa",
         label: "Chart of Accounts",

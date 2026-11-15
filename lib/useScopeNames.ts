@@ -44,6 +44,8 @@ export function useScopeNames(): {
   ready: boolean;
   /** Nama vihara, atau null bila belum/tidak diketahui. */
   viharaName: (id: number | null | undefined) => string | null;
+  /** Nama & kode yayasan dalam jangkauan akun (judul laporan tingkat yayasan). */
+  yayasan: { name: string; code: string };
 } {
   const [data, setData] = useState(cache);
 
@@ -59,11 +61,33 @@ export function useScopeNames(): {
     };
   }, []);
 
+  const entities = data?.entities ?? [];
+
   return {
-    entities: data?.entities ?? [],
+    entities,
     viharas: data?.viharas ?? [],
     ready: data != null,
     viharaName: (id) =>
       id == null ? null : (data?.viharas.find((v) => v.id === id)?.name ?? null),
+    yayasan: yayasanLabel(data == null, entities),
+  };
+}
+
+/**
+ * Nama & kode yayasan dalam jangkauan akun, untuk judul laporan tingkat
+ * yayasan (FV-65). Dulu ditulis tetap "Yayasan Dhammavihara Indonesia".
+ * Satu yayasan → namanya; beberapa (akun global) → digabung; belum termuat
+ * → penanda netral, bukan nama yayasan tertentu.
+ */
+export function yayasanLabel(loading: boolean, entities: ScopeEntity[]): { name: string; code: string } {
+  if (loading) return { name: "Memuat…", code: "" };
+  if (entities.length === 0) return { name: "Yayasan", code: "" };
+  if (entities.length === 1) return { name: entities[0].legal_name, code: entities[0].code };
+  // Urut kode, sama dengan judul Konsolidasi (FV-63), supaya kedua laporan
+  // menyebut gabungan yayasan dengan urutan yang sama.
+  const urut = [...entities].sort((a, b) => a.code.localeCompare(b.code));
+  return {
+    name: urut.map((e) => e.legal_name).join(" + "),
+    code: urut.map((e) => e.code).join("+"),
   };
 }

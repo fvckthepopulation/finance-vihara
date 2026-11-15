@@ -222,8 +222,9 @@ test.describe("v34 tambah role", () => {
     // Role buatan sendiri: tombol hapus aktif, dan benar-benar menghapus.
     const tombol = page.getByTestId(`role-hapus-${roleName}`);
     await expect(tombol).toBeEnabled();
-    page.once("dialog", (d) => d.accept());
     await tombol.click();
+    // FV-70: konfirmasi memakai dialog aplikasi, bukan window.confirm.
+    await page.getByTestId("dialog-konfirmasi").click();
     await expect(page.getByTestId(`role-card-${roleName}`)).toHaveCount(0, { timeout: 10_000 });
 
     // Hilang di server juga, bukan cuma di layar.

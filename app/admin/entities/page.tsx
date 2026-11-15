@@ -17,6 +17,7 @@ import { Modal } from "@/components/Modal";
 import { Field, Input, Textarea } from "@/components/Field";
 import { ImportExcelButton } from "@/components/ImportExcelButton";
 import { Pagination } from "@/components/Pagination";
+import { dialog } from "@/components/Dialog";
 
 export default function EntitiesPage() {
   const { can } = useAuth();
@@ -44,13 +45,14 @@ export default function EntitiesPage() {
   useEffect(load, [page]);
 
   async function handleDelete(e: MasterEntity) {
-    if (!confirm(`Hapus yayasan ${e.code}?`)) return;
-    try {
-      await deleteEntity(e.id);
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus yayasan ${e.code}`,
+      message: `${e.legal_name} akan dihapus. Tindakan ini tidak bisa dibatalkan.`,
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteEntity(e.id),
+    });
+    if (ya) load();
   }
 
   return (

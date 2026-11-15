@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
+import { DialogHost } from "@/components/Dialog";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -32,7 +33,10 @@ export default function RootLayout({
       lang="id"
       className={`${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {children}
+        <DialogHost />
+      </body>
     </html>
   );
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { STATUS_LABEL, StatusTransaksi, bisaDilanjutkan } from "@/lib/statusTransaksi";
 import { fmtTanggal } from "@/lib/tanggal";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 // ============================================================================
 // Detail satu transaksi — dipakai penerimaan DAN pengeluaran.
@@ -204,45 +205,41 @@ export function TransaksiDetail<T extends BarisTransaksi>({
 
   async function tolak() {
     if (!data) return;
-    const alasan = window.prompt(
-      `Tolak ${data.code}?\n\nTransaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
-    );
-    if (alasan === null) return;
-    if (alasan.trim().length < 3) {
-      setError("Alasan penolakan terlalu singkat.");
-      return;
-    }
     setError(null);
+    // Dialog sendiri yang menampilkan status "Memproses…" dan error-nya;
+    // tombol di Detail baru dikunci setelah penolakan berhasil (saat memuat ulang).
+    const alasan = await dialog.prompt({
+      title: `Tolak ${data.code}`,
+      message: "Transaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.",
+      label: "Alasan penolakan",
+      confirmLabel: "Tolak",
+      tone: "danger",
+      action: (a) => modul.tolak(data.id, a),
+    });
+    if (alasan == null) return;
+    setInfo(`${ucfirst(modul.sebutan)} ${data.code} ditolak`);
     setSedang("tolak");
     try {
-      await modul.tolak(data.id, alasan.trim());
-      setInfo(`${ucfirst(modul.sebutan)} ${data.code} ditolak`);
       await muat();
-      onChanged?.();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menolak");
     } finally {
       setSedang(null);
     }
+    onChanged?.();
   }
 
   async function hapus() {
     if (!data) return;
-    const ya = window.confirm(
-      `Hapus draft ${data.code}?\n\nDraft belum membuat jurnal, jadi tidak ada ` +
-        `yang perlu dibalik. Tindakan ini tidak bisa dibatalkan.`,
-    );
-    if (!ya) return;
     setError(null);
-    setSedang("hapus");
-    try {
-      await modul.hapus(data.id);
-      onChanged?.();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menghapus draft");
-      setSedang(null);
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus draft ${data.code}`,
+      message: "Draft belum membuat jurnal, jadi tidak ada yang perlu dibalik. Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => modul.hapus(data.id),
+    });
+    if (!ya) return;
+    onChanged?.();
+    onClose();
   }
 
   const baris = data ? modul.baris(data) : [];
@@ -265,7 +262,12 @@ export function TransaksiDetail<T extends BarisTransaksi>({
               type="button"
               variant="default"
               disabled={sedang !== null}
-              onClick={() => router.push(ubahHref(data))}
+              // Tutup modal dulu, baru buka form draft (FV-69). Tanpa ini
+              // modal tetap terbuka saat formnya ada di halaman yang sama.
+              onClick={() => {
+                onClose();
+                router.push(ubahHref(data));
+              }}
               data-testid="ubah-draft"
             >
               Ubah

@@ -70,6 +70,8 @@ test.describe("v31 admin vihara", () => {
     const itemB = section.locator("li", { hasText: picB });
     await expect(itemB).toBeVisible({ timeout: 10_000 });
     await itemB.getByRole("button", { name: "Hapus" }).click();
+    // Hapus PIC kini meminta konfirmasi (dialog aplikasi).
+    await page.getByTestId("dialog-konfirmasi").click();
     await expect(page.getByText("PIC dihapus")).toBeVisible({ timeout: 10_000 });
 
     // Refresh penuh → keduanya tidak terdaftar.

@@ -121,6 +121,8 @@ export type CreateJournalEntryPayload = {
   entry_date: string;
   description: string;
   reference?: string;
+  /** true = langsung posting (butuh journal.approve), false/kosong = draft (FV-68). */
+  posting?: boolean;
   lines: {
     account_code: string;
     debit: number;
@@ -135,14 +137,13 @@ export const createJournalEntry = (payload: CreateJournalEntryPayload) =>
     body: JSON.stringify(payload),
   });
 
-/** Batalkan jurnal terposting — server menulis jurnal pembalik. */
-/**
- * Siklus persetujuan jurnal manual (FV-53).
- *
- * Sebelumnya jurnal manual lahir sebagai draft dan berhenti di situ: tidak
- * ada jalan menuju posted, padahal laporan hanya membaca yang posted. Jadi
- * saldo awal dan koreksi tidak pernah berpengaruh ke mana pun.
- */
+/** Ubah jurnal manual yang belum diposting (FV-68). */
+export const updateJournalEntry = (id: number, payload: CreateJournalEntryPayload) =>
+  api<JournalEntryDetail>(`/api/journal-entries/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
 /**
  * Unduh Jurnal & Buku Besar sebagai .xlsx (FV-59).
  *
@@ -183,17 +184,15 @@ export async function unduhJurnalExcel(params: {
   return { blob: await res.blob(), filename: cocok?.[1] ?? "Jurnal.xlsx" };
 }
 
-export const submitJournalEntry = (id: number) =>
-  api<JournalEntryRow>(`/api/journal-entries/${id}/submit`, { method: "POST" });
-
+/**
+ * Posting jurnal manual (FV-68). Tanpa pengajuan/persetujuan: jurnal manual
+ * dibuat admin, dan yang membatasi siapa boleh memposting cukup permission
+ * journal.approve ("Posting jurnal manual").
+ */
 export const postJournalEntry = (id: number) =>
   api<JournalEntryRow>(`/api/journal-entries/${id}/post`, { method: "POST" });
 
-export const rejectJournalEntry = (id: number, reason: string) =>
-  api<JournalEntryRow>(`/api/journal-entries/${id}/reject`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-  });
+/** Batalkan jurnal terposting — server menulis jurnal pembalik. */
 
 export const voidJournalEntry = (id: number, reason: string) =>
   api<unknown>(`/api/journal-entries/${id}/void`, {

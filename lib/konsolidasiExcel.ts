@@ -1,13 +1,14 @@
 import type { Worksheet } from "exceljs";
 import { num } from "./kasBank";
-import { KonsolidasiResponse } from "./konsolidasi";
+import { barisKonsolidasi, KonsolidasiEntry, KonsolidasiResponse, multiYayasan } from "./konsolidasi";
 import { listTransactions, TransactionRow } from "./transactions";
 
 // ============================================================================
 // Export Excel Laporan Konsolidasi Yayasan — ala mockup exportKonsolidasi():
 //   1. Posisi Keuangan            4. Arus Kas
 //   2. Penghasilan Komprehensif   5. Perbandingan Vihara
-//   3. Perubahan Aset Neto        6..N. Detail transaksi per vihara (6. VVG, …)
+//   3. Perubahan Aset Neto        6. Subtotal per Yayasan (hanya bila beberapa yayasan)
+//   6/7..N. Detail transaksi per vihara
 // ExcelJS dimuat via dynamic import supaya bundle halaman tetap ramping.
 // ============================================================================
 
@@ -38,10 +39,13 @@ function addRows(ws: Worksheet, rows: Cell[][]) {
 
 // Detail transaksi satu vihara — semua halaman (per_page maks 200, cap 25 hlm).
 async function fetchViharaTransactions(
-  viharaId: number,
+  viharaId: number | null,
   from: string,
   to: string,
 ): Promise<TransactionRow[]> {
+  // Baris "Kantor Yayasan" (id null) tidak punya transaksi vihara; tanpa
+  // penjaga ini filter vihara_id hilang dan semua transaksi ikut terambil.
+  if (viharaId == null) return [];
   const all: TransactionRow[] = [];
   let page = 1;
   for (;;) {
@@ -96,7 +100,9 @@ export async function exportKonsolidasiExcel(opts: {
   const { data, periodeLabel } = opts;
   const org = data.yayasan.nama;
   const K = data.konsolidasi;
-  const VD = data.per_vihara;
+  if (!K) throw new Error("Belum ada data konsolidasi untuk diekspor.");
+  // Beberapa yayasan: nama vihara diberi kode yayasannya (FV-63).
+  const VD = barisKonsolidasi(data);
   const TODAY = new Date().toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
@@ -235,9 +241,36 @@ export async function exportKonsolidasiExcel(opts: {
   ];
   addRows(ws5, s5);
 
-  // ── Sheet 6..N: Detail per vihara ──
+  // ── Sheet 6 (hanya bila beberapa yayasan): Subtotal per Yayasan ──
+  let nomorDetail = 6;
+  if (multiYayasan(data)) {
+    const wsY = wb.addWorksheet("6. Subtotal per Yayasan");
+    wsY.columns = [{ width: 44 }, { width: 8 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }];
+    const baris = (e: KonsolidasiEntry | null): Cell[] => [
+      num(e?.pendapatan.total ?? 0),
+      num(e?.beban.total ?? 0),
+      num(e?.kenaikan.total ?? 0),
+      num(e?.posisi.total_aset ?? 0),
+      num(e?.posisi.aset_neto.total ?? 0),
+    ];
+    addRows(wsY, [
+      [org], ["SUBTOTAL PER YAYASAN"], [`Periode: ${periodeLabel}`], [],
+      ["Yayasan", "Unit", "Pendapatan", "Beban", "Kenaikan Aset Neto", "Total Aset", "Aset Neto"],
+      ...(data.per_yayasan ?? []).map((g): Cell[] => [
+        `${g.yayasan.code} — ${g.yayasan.nama}`,
+        g.per_vihara.length,
+        ...baris(g.subtotal),
+      ]),
+      [`TOTAL GABUNGAN (${data.yayasan.singkatan})`, data.per_vihara.length, ...baris(K)],
+      [],
+      ["Catatan: transaksi antar yayasan tidak dieliminasi."],
+    ]);
+    nomorDetail = 7;
+  }
+
+  // ── Sheet 6/7..N: Detail per vihara ──
   VD.forEach((v, i) => {
-    addDetailSheet(wb.addWorksheet(`${i + 6}. ${v.vihara.code}`), details[i]);
+    addDetailSheet(wb.addWorksheet(`${i + nomorDetail}. ${v.vihara.code}`), details[i]);
   });
 
   const filename = `KonsolidasiYayasan_${data.yayasan.singkatan}_${periodeLabel.replace(/\s+/g, "_")}.xlsx`;

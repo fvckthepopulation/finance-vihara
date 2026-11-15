@@ -10,10 +10,9 @@ import { Toast } from "@/components/Toast";
 import { exportCetakExcel, groupCetak } from "@/lib/cetakExcel";
 import { num } from "@/lib/kasBank";
 import { listTransactions, TransactionRow, TransactionTipe } from "@/lib/transactions";
+import { useScopeNames } from "@/lib/useScopeNames";
 import { useVihara } from "@/lib/useVihara";
 import { listViharas, Vihara } from "@/lib/vihara";
-
-const YAYASAN = "Yayasan Dhammavihara Indonesia";
 
 const DANA_OPTIONS = ["dana_perayaan", "dana_operasional", "dana_bhikkhu", "dana_paramita"];
 
@@ -144,6 +143,8 @@ export default function CetakPage() {
 
   const [viharas, setViharas] = useState<Vihara[]>([]);
   const { viharaId, ready: viharaReady } = useVihara();
+  // Nama yayasan dari jangkauan akun, bukan ditulis tetap (FV-65).
+  const { yayasan } = useScopeNames();
 
   const [busy, setBusy] = useState<null | "preview" | "print" | "export">(null);
   const [preview, setPreview] = useState<LoadedReport | null>(null);
@@ -159,8 +160,8 @@ export default function CetakPage() {
   }, []);
 
   const vihara = viharaId != null ? viharas.find((v) => v.id === viharaId) : undefined;
-  const org = viharaId == null ? YAYASAN : vihara?.name ?? "";
-  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? "";
+  const org = viharaId == null ? yayasan.name : vihara?.name ?? "";
+  const orgCode = viharaId == null ? yayasan.code : vihara?.code ?? "";
 
   // Ambil transaksi posted sesuai filter — paginasi per_page 200, cap 10 hlm/tipe.
   async function fetchRows(): Promise<{ rows: TransactionRow[]; truncated: boolean }> {

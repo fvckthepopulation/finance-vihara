@@ -56,7 +56,9 @@ test.describe("v12 riwayat", () => {
     await page.goto("/riwayat");
 
     await selectByLabelRegex(page.getByLabel("Tipe"), /Pengeluaran/);
-    await page.waitForTimeout(1000);
+    // Tunggu muatan selesai, bukan jeda tetap: API lokal (artisan serve)
+    // melayani satu request sekaligus, jadi daftar bisa > 1 detik.
+    await expect(page.locator("tbody")).not.toContainText("Memuat", { timeout: 15_000 });
 
     const rows = page.locator("tbody tr");
     const count = await rows.count();

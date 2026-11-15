@@ -17,12 +17,16 @@ import {
 import { Toast } from "@/components/Toast";
 import { num } from "@/lib/kasBank";
 import {
+  barisKonsolidasi,
   getKonsolidasi,
+  KonsolidasiEntry,
   KonsolidasiPerVihara,
   KonsolidasiResponse,
+  multiYayasan,
   viharaColor,
 } from "@/lib/konsolidasi";
 import { exportKonsolidasiExcel } from "@/lib/konsolidasiExcel";
+import { useScopeNames } from "@/lib/useScopeNames";
 import { Isak35Mode, isak35PeriodLabel, MONTHS_ID } from "@/lib/laporanKeuangan";
 
 type TabKey =
@@ -42,8 +46,11 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "perbandingan", label: "Perbandingan Vihara" },
 ];
 
-/** per_vihara + warna identitasnya. */
-type VRow = KonsolidasiPerVihara & { warna: string };
+/** per_vihara + warna identitasnya + kunci unik (Kantor Yayasan tiap yayasan ber-id null). */
+type VRow = KonsolidasiPerVihara & { warna: string; kunci: string };
+
+/** Respons yang sudah pasti punya angka konsolidasi. */
+type DataLengkap = KonsolidasiResponse & { konsolidasi: KonsolidasiEntry };
 
 export default function KonsolidasiPage() {
   const now = new Date();
@@ -51,10 +58,14 @@ export default function KonsolidasiPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [tab, setTab] = useState<TabKey>("ringkasan");
+  // null = semua yayasan dalam jangkauan akun (FV-63).
+  const [entityId, setEntityId] = useState<number | null>(null);
   const [data, setData] = useState<KonsolidasiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  // Penanda yayasan sebelum data termuat — bukan nama yayasan tertentu (FV-65).
+  const { yayasan } = useScopeNames();
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
@@ -62,7 +73,7 @@ export default function KonsolidasiPage() {
     let alive = true;
     setLoading(true);
     setError(null);
-    getKonsolidasi({ mode, year, month })
+    getKonsolidasi({ mode, year, month, entityId })
       .then((d) => {
         if (alive) setData(d);
       })
@@ -77,7 +88,7 @@ export default function KonsolidasiPage() {
     return () => {
       alive = false;
     };
-  }, [mode, year, month]);
+  }, [mode, year, month, entityId]);
 
   const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
   const periodeLabel = isak35PeriodLabel(mode, year, month);
@@ -99,8 +110,24 @@ export default function KonsolidasiPage() {
     }
   }
 
+  const pilihanYayasan = data?.yayasan_pilihan ?? [];
   const periodSelector = (
     <div className="flex items-center gap-1.5">
+      {/* Pilihan yayasan hanya untuk akun yang menjangkau lebih dari satu yayasan. */}
+      {pilihanYayasan.length > 1 && (
+        <TopbarSelect
+          value={entityId ?? ""}
+          onChange={(e) => setEntityId(e.target.value === "" ? null : Number(e.target.value))}
+          className="max-w-[220px]"
+          aria-label="Yayasan"
+          data-testid="konsol-yayasan"
+        >
+          <option value="">Semua yayasan</option>
+          {pilihanYayasan.map((y) => (
+            <option key={y.id} value={y.id}>{y.code} — {y.nama}</option>
+          ))}
+        </TopbarSelect>
+      )}
       <TopbarSelect
         value={mode}
         onChange={(e) => setMode(e.target.value as Isak35Mode)}
@@ -135,13 +162,20 @@ export default function KonsolidasiPage() {
     </div>
   );
 
-  const vd: VRow[] =
-    data?.per_vihara.map((v, i) => ({ ...v, warna: viharaColor(v.vihara.code, i) })) ?? [];
+  const vd: VRow[] = data
+    ? barisKonsolidasi(data).map((v, i) => ({
+        ...v,
+        warna: viharaColor(v.vihara.code, i),
+        kunci: `${v.vihara.yayasan_code ?? ""}-${v.vihara.id ?? v.vihara.code}`,
+      }))
+    : [];
+  const jumlahYayasan = data?.per_yayasan?.length ?? 1;
+  const lengkap: DataLengkap | null = data && data.konsolidasi ? (data as DataLengkap) : null;
 
   return (
     <AppShell
       title="Konsolidasi Yayasan"
-      subtitle="Laporan gabungan seluruh vihara dalam naungan Yayasan Dhammavihara Indonesia"
+      subtitle={`Laporan gabungan seluruh vihara dalam naungan ${data?.yayasan.nama ?? yayasan.name}`}
       actions={forbidden ? undefined : periodSelector}
     >
       {forbidden ? (
@@ -168,15 +202,16 @@ export default function KonsolidasiPage() {
 
           <Card className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
             <CardHeader
-              title={`Laporan Konsolidasi — ${data?.yayasan.nama ?? "Yayasan Dhammavihara Indonesia"}`}
+              title={`Laporan Konsolidasi — ${data?.yayasan.nama ?? yayasan.name}`}
               subtitle={
                 <>
-                  Gabungan {data?.per_vihara.length ?? "—"} vihara ·{" "}
+                  Gabungan {data?.per_vihara.length ?? "—"} vihara
+                  {jumlahYayasan > 1 ? ` dari ${jumlahYayasan} yayasan` : ""} ·{" "}
                   <span className="font-medium">{periodeLabel}</span>
                 </>
               }
               right={
-                <Button variant="primary" onClick={handleExport} disabled={!data || exporting}>
+                <Button variant="primary" onClick={handleExport} disabled={!lengkap || exporting}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M4 13h8M8 3v7M5 7l3 3 3-3" />
                   </svg>
@@ -190,7 +225,7 @@ export default function KonsolidasiPage() {
               <div className="flex flex-wrap gap-2 border-b border-km-border px-4 py-2.5">
                 {vd.map((v) => (
                   <span
-                    key={v.vihara.id}
+                    key={v.kunci}
                     data-testid="konsol-chip"
                     className="rounded-full px-3 py-1 text-[11px] font-semibold"
                     style={{
@@ -228,18 +263,18 @@ export default function KonsolidasiPage() {
               <p className="px-4 py-12 text-center text-[12px] text-km-ink-muted">
                 Memuat laporan konsolidasi…
               </p>
-            ) : !data ? (
+            ) : !lengkap ? (
               <p className="px-4 py-12 text-center text-[12px] text-km-ink-muted">
-                Laporan konsolidasi belum tersedia.
+                {data ? "Belum ada vihara maupun jurnal untuk yayasan ini." : "Laporan konsolidasi belum tersedia."}
               </p>
             ) : (
               <>
-                {tab === "ringkasan" && <RingkasanTab data={data} vd={vd} periode={periodeLabel} />}
-                {tab === "posisi" && <PosisiTab data={data} vd={vd} periode={periodeLabel} />}
-                {tab === "penghasilan" && <PenghasilanTab data={data} vd={vd} periode={periodeLabel} />}
-                {tab === "perubahan" && <PerubahanTab data={data} periode={periodeLabel} />}
-                {tab === "aruskas" && <ArusKasTab data={data} vd={vd} periode={periodeLabel} />}
-                {tab === "perbandingan" && <PerbandinganTab data={data} vd={vd} />}
+                {tab === "ringkasan" && <RingkasanTab data={lengkap} vd={vd} periode={periodeLabel} />}
+                {tab === "posisi" && <PosisiTab data={lengkap} vd={vd} periode={periodeLabel} />}
+                {tab === "penghasilan" && <PenghasilanTab data={lengkap} vd={vd} periode={periodeLabel} />}
+                {tab === "perubahan" && <PerubahanTab data={lengkap} periode={periodeLabel} />}
+                {tab === "aruskas" && <ArusKasTab data={lengkap} vd={vd} periode={periodeLabel} />}
+                {tab === "perbandingan" && <PerbandinganTab data={lengkap} vd={vd} />}
               </>
             )}
           </Card>
@@ -251,7 +286,69 @@ export default function KonsolidasiPage() {
   );
 }
 
-type TabProps = { data: KonsolidasiResponse; vd: VRow[]; periode: string };
+type TabProps = { data: DataLengkap; vd: VRow[]; periode: string };
+
+/**
+ * Subtotal per yayasan + total gabungan, tampil bila beberapa yayasan
+ * digabung (FV-63). Subtotal tiap yayasan = Laporan Keuangan yayasan itu.
+ */
+function SubtotalYayasan({ data }: { data: DataLengkap }) {
+  if (!multiYayasan(data)) return null;
+  const K = data.konsolidasi;
+  const kolom = (e: KonsolidasiEntry | null) => [
+    num(e?.pendapatan.total ?? 0),
+    num(e?.beban.total ?? 0),
+    num(e?.kenaikan.total ?? 0),
+    num(e?.posisi.total_aset ?? 0),
+    num(e?.posisi.aset_neto.total ?? 0),
+  ];
+  const th = "px-2 py-1.5 text-right text-[10px] font-semibold text-km-ink-muted";
+  const td = "px-2 py-2 text-right text-[11px] tabular-nums";
+  return (
+    <Card className="mb-3.5">
+      <CardHeader
+        title="Subtotal per Yayasan"
+        subtitle="Tiap baris sama dengan Laporan Keuangan yayasan tersebut; transaksi antar yayasan tidak dieliminasi"
+      />
+      <div className="overflow-x-auto">
+        <table className="w-full" data-testid="konsol-subtotal-yayasan">
+          <thead>
+            <tr className="bg-km-bg">
+              <th className="min-w-[180px] px-3 py-1.5 text-left text-[10px] font-semibold text-km-ink-muted">Yayasan</th>
+              <th className="px-2 py-1.5 text-right text-[10px] font-semibold text-km-ink-muted">Unit</th>
+              <th className={th}>Pendapatan</th>
+              <th className={th}>Beban</th>
+              <th className={th}>Kenaikan Aset Neto</th>
+              <th className={th}>Total Aset</th>
+              <th className={`${th} pr-3`}>Aset Neto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data.per_yayasan ?? []).map((g) => (
+              <tr key={g.yayasan.id} className="border-b border-km-border/40">
+                <td className="px-3 py-2 text-[11px]">
+                  <span className="font-semibold">{g.yayasan.code}</span>{" "}
+                  <span className="text-km-ink-muted">{g.yayasan.nama}</span>
+                </td>
+                <td className="px-2 py-2 text-right text-[11px] text-km-ink-muted">{g.per_vihara.length}</td>
+                {kolom(g.subtotal).map((n, i) => (
+                  <td key={i} className={`${td} ${i === 4 ? "pr-3" : ""}`}>{fmtRp(n)}</td>
+                ))}
+              </tr>
+            ))}
+            <tr className="bg-km-panel-soft font-semibold">
+              <td className="px-3 py-2 text-[11px]">Total gabungan ({data.yayasan.singkatan})</td>
+              <td className="px-2 py-2 text-right text-[11px]">{data.per_vihara.length}</td>
+              {kolom(K).map((n, i) => (
+                <td key={i} className={`${td} ${i === 4 ? "pr-3" : ""}`}>{fmtRp(n)}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
 
 function ViharaNameCell({ v }: { v: VRow }) {
   return (
@@ -280,6 +377,7 @@ function RingkasanTab({ data, vd, periode }: TabProps) {
   const sub = `${vd.length} vihara · ${periode}`;
   return (
     <div className="p-4">
+      <SubtotalYayasan data={data} />
       {/* 3 metric cards */}
       <div className="mb-3.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-km-border bg-km-panel px-3.5 py-3">
@@ -333,7 +431,7 @@ function RingkasanTab({ data, vd, periode }: TabProps) {
                 {vd.map((v) => {
                   const ken = num(v.kenaikan.total);
                   return (
-                    <tr key={v.vihara.id} className="border-b border-km-border/40">
+                    <tr key={v.kunci} className="border-b border-km-border/40">
                       <td className="px-3 py-1.5">
                         <ViharaNameCell v={v} />
                       </td>
@@ -382,7 +480,7 @@ function RingkasanTab({ data, vd, periode }: TabProps) {
         <Card>
           <CardHeader title="Posisi Aset per Vihara" />
           {vd.map((v) => (
-            <div key={v.vihara.id} className="border-b border-km-border/40 px-4 py-2.5">
+            <div key={v.kunci} className="border-b border-km-border/40 px-4 py-2.5">
               <div className="mb-0.5 flex items-center justify-between">
                 <span className="text-[12px] font-semibold" style={{ color: v.warna }}>
                   {v.vihara.name}
@@ -417,7 +515,7 @@ function PosisiTab({ data, vd, periode }: TabProps) {
       <LapHeader>Kas dan Setara Kas</LapHeader>
       {vd.map((v) => (
         <LapRow
-          key={v.vihara.id}
+          key={v.kunci}
           indent={1}
           label={`${v.vihara.name} — Kas & Bank`}
           labelColor={v.warna}
@@ -428,7 +526,7 @@ function PosisiTab({ data, vd, periode }: TabProps) {
       <LapHeader>Piutang Platform (1160)</LapHeader>
       {vd.map((v) => (
         <LapRow
-          key={v.vihara.id}
+          key={v.kunci}
           indent={1}
           label={`${v.vihara.name} — Piutang PG`}
           labelColor={v.warna}
@@ -441,7 +539,7 @@ function PosisiTab({ data, vd, periode }: TabProps) {
       <LapHeader>LIABILITAS</LapHeader>
       {viharaLiab.map((v) => (
         <LapRow
-          key={v.vihara.id}
+          key={v.kunci}
           indent={1}
           label={v.vihara.name}
           labelColor={v.warna}
@@ -469,7 +567,7 @@ function PosisiTab({ data, vd, periode }: TabProps) {
         )}
         {vd.map((v) => (
           <div
-            key={v.vihara.id}
+            key={v.kunci}
             className={v.posisi.balance_ok ? "text-km-ink-muted" : "text-km-amber-ink"}
           >
             {v.vihara.name}: Aset {fmtRp(num(v.posisi.total_aset))}{" "}
@@ -500,7 +598,7 @@ function PenghasilanTab({ data, vd, periode }: TabProps) {
             <Hdr3>PENDAPATAN DAN DUKUNGAN — PER VIHARA</Hdr3>
             {vd.map((v) => (
               <Row3
-                key={v.vihara.id}
+                key={v.kunci}
                 indent={1}
                 label={v.vihara.name}
                 labelColor={v.warna}
@@ -522,7 +620,7 @@ function PenghasilanTab({ data, vd, periode }: TabProps) {
               .filter((v) => num(v.beban.total) > 0)
               .map((v) => (
                 <Row3
-                  key={v.vihara.id}
+                  key={v.kunci}
                   indent={1}
                   label={v.vihara.name}
                   labelColor={v.warna}
@@ -542,7 +640,7 @@ function PenghasilanTab({ data, vd, periode }: TabProps) {
             <Hdr3>KENAIKAN / (PENURUNAN) ASET NETO</Hdr3>
             {vd.map((v) => (
               <Row3
-                key={v.vihara.id}
+                key={v.kunci}
                 indent={1}
                 label={v.vihara.name}
                 labelColor={v.warna}
@@ -570,7 +668,7 @@ function PenghasilanTab({ data, vd, periode }: TabProps) {
 // ── TAB 4: PERUBAHAN ASET NETO KONSOLIDASI ──
 // Backend tidak mengirim aset neto awal konsolidasi — diturunkan:
 // awal = aset neto akhir − kenaikan (per kolom TP/DP/Total).
-function PerubahanTab({ data, periode }: { data: KonsolidasiResponse; periode: string }) {
+function PerubahanTab({ data, periode }: { data: DataLengkap; periode: string }) {
   const K = data.konsolidasi;
   const akhir = {
     tp: num(K.posisi.aset_neto.tp),
@@ -645,7 +743,7 @@ function ArusKasTab({ data, vd, periode }: TabProps) {
         const ak = num(v.arus_kas_bersih);
         return (
           <LapRow
-            key={v.vihara.id}
+            key={v.kunci}
             indent={1}
             label={v.vihara.name}
             labelColor={v.warna}
@@ -670,7 +768,7 @@ function ArusKasTab({ data, vd, periode }: TabProps) {
 }
 
 // ── TAB 6: PERBANDINGAN VIHARA ──
-function PerbandinganTab({ data, vd }: { data: KonsolidasiResponse; vd: VRow[] }) {
+function PerbandinganTab({ data, vd }: { data: DataLengkap; vd: VRow[] }) {
   const K = data.konsolidasi;
   const kenTotal = num(K.kenaikan.total);
   const th = "px-3 py-2 text-right text-[11px] font-semibold text-km-ink-muted";
@@ -692,7 +790,7 @@ function PerbandinganTab({ data, vd }: { data: KonsolidasiResponse; vd: VRow[] }
           {vd.map((v) => {
             const ken = num(v.kenaikan.total);
             return (
-              <tr key={v.vihara.id} className="border-b border-km-border/40">
+              <tr key={v.kunci} className="border-b border-km-border/40">
                 <td className="px-4 py-2 text-[12px] font-semibold" style={{ color: v.warna }}>
                   {v.vihara.name}
                   <br />

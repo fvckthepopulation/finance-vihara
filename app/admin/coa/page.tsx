@@ -21,6 +21,7 @@ import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input, Select, Textarea } from "@/components/Field";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
+import { dialog } from "@/components/Dialog";
 
 const TYPE_TONE: Record<AccountType, "info" | "warn" | "purple" | "success" | "danger"> = {
   asset: "info",
@@ -68,15 +69,14 @@ export default function CoaPage() {
   useEffect(() => setPage(1), [search, typeFilter, showInactive, perPage]);
 
   async function handleDelete(account: CoaAccount) {
-    if (!confirm(`Hapus akun ${account.code} ${account.name}?\nIni akan gagal kalau akun sudah dipakai di jurnal.`)) {
-      return;
-    }
-    try {
-      await deleteCoa(account.code);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal hapus");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus akun ${account.code} ${account.name}`,
+      message: "Penghapusan akan ditolak kalau akun sudah dipakai di jurnal.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteCoa(account.code),
+    });
+    if (ya) load();
   }
 
   const grouped = useMemo(() => {

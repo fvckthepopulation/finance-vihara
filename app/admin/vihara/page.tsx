@@ -29,11 +29,15 @@ import {
 } from "@/lib/vihara";
 import { useAuth } from "@/lib/useAuth";
 import { MasterEntity, listEntities } from "@/lib/masters";
+import { dialog } from "@/components/Dialog";
 
 export default function AdminViharaPage() {
   const { can } = useAuth();
   const canManage = can("masters.manage");
-  const canVerify = can("campaign.verify");
+  // Sama dengan izin route POST /viharas/{id}/verify. Dulu memakai
+  // "campaign.verify" yang tidak ada di daftar permission, sehingga tombol
+  // Verify tidak pernah muncul untuk siapa pun.
+  const canVerify = can("masters.manage");
 
   const [rows, setRows] = useState<Vihara[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,23 +58,25 @@ export default function AdminViharaPage() {
   useEffect(reload, [search]);
 
   async function handleVerify(v: Vihara) {
-    if (!confirm(`Verifikasi vihara "${v.name}"? Setelah verified, vihara bisa menerima settlement.`)) return;
-    try {
-      await verifyVihara(v.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal verify");
-    }
+    const ya = await dialog.confirm({
+      title: `Verifikasi vihara "${v.name}"`,
+      message: "Setelah terverifikasi, vihara bisa menerima settlement.",
+      confirmLabel: "Verifikasi",
+      tone: "primary",
+      action: () => verifyVihara(v.id),
+    });
+    if (ya) reload();
   }
 
   async function handleDelete(v: Vihara) {
-    if (!confirm(`Hapus vihara "${v.name}"? (akan gagal jika sudah ada donasi)`)) return;
-    try {
-      await deleteVihara(v.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal hapus");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus vihara "${v.name}"`,
+      message: "Penghapusan akan ditolak jika vihara sudah memiliki donasi. Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteVihara(v.id),
+    });
+    if (ya) reload();
   }
 
   // Pencarian sudah di server (`q`); halaman dipotong di peramban karena
@@ -353,6 +359,15 @@ function PicSection({
   }
 
   async function handleDelete(p: PettyCashPic) {
+    // Dulu langsung terhapus tanpa konfirmasi (temuan saat uji FV-70).
+    const ya = await dialog.confirm({
+      title: `Hapus PIC kas kecil ${p.name}`,
+      message:
+        "PIC yang sudah dipakai transaksi tidak bisa dihapus; sistem akan menonaktifkannya sebagai gantinya.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+    });
+    if (!ya) return;
     try {
       await deletePettyCashPic(p.id);
       onToast("PIC dihapus", "success");

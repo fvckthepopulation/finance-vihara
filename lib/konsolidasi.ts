@@ -8,10 +8,13 @@ import { Isak35Mode, Money, TpDp } from "./laporanKeuangan";
 // ============================================================================
 
 export type KonsolidasiVihara = {
-  id: number;
+  /** null = baris "Kantor Yayasan" (jurnal tingkat yayasan). */
+  id: number | null;
   code: string;
   name: string;
   kota: string | null;
+  /** Kode yayasan pemilik baris ini (FV-63). */
+  yayasan_code?: string;
 };
 
 export type KonsolidasiBeban = {
@@ -51,21 +54,58 @@ export type KonsolidasiPeriod = {
   end: string; // YYYY-MM-DD
 };
 
+export type KonsolidasiYayasan = { id: number; code: string; nama: string };
+
+/** Satu kelompok yayasan: vihara + kantor pusatnya, dengan subtotal (FV-63). */
+export type KonsolidasiPerYayasan = {
+  yayasan: KonsolidasiYayasan;
+  per_vihara: KonsolidasiPerVihara[];
+  subtotal: KonsolidasiEntry | null;
+};
+
 export type KonsolidasiResponse = {
   period: KonsolidasiPeriod;
-  yayasan: { nama: string; singkatan: string };
+  /** Nama & kode yayasan yang digabung; beberapa yayasan → "A + B". */
+  yayasan: { nama: string; singkatan: string; jumlah?: number };
+  /** Yayasan yang dipilih; null = semua yayasan dalam jangkauan akun. */
+  entity_id?: number | null;
+  /** Pilihan yayasan untuk dropdown — hanya yang boleh diakses akun. */
+  yayasan_pilihan?: KonsolidasiYayasan[];
+  per_yayasan?: KonsolidasiPerYayasan[];
+  /** Semua baris dari semua kelompok, berurutan per yayasan. */
   per_vihara: KonsolidasiPerVihara[];
-  konsolidasi: KonsolidasiEntry;
+  /** null bila tidak ada vihara/jurnal sama sekali. */
+  konsolidasi: KonsolidasiEntry | null;
 };
 
 export function getKonsolidasi(params: {
   mode: Isak35Mode;
   year: number;
   month?: number;
+  /** null/undefined = semua yayasan. */
+  entityId?: number | null;
 }): Promise<KonsolidasiResponse> {
   const sp = new URLSearchParams({ mode: params.mode, year: String(params.year) });
   if (params.mode === "bulan" && params.month) sp.set("month", String(params.month));
+  if (params.entityId != null) sp.set("entity_id", String(params.entityId));
   return api<KonsolidasiResponse>(`/api/laporan/konsolidasi?${sp}`);
+}
+
+/** Laporan menggabungkan lebih dari satu yayasan? */
+export function multiYayasan(data: KonsolidasiResponse): boolean {
+  return (data.per_yayasan?.length ?? 0) > 1;
+}
+
+/**
+ * Baris per vihara untuk ditampilkan. Bila beberapa yayasan digabung, nama
+ * diberi kode yayasannya — "Kantor Yayasan" tiap yayasan jadi bisa dibedakan.
+ */
+export function barisKonsolidasi(data: KonsolidasiResponse): KonsolidasiPerVihara[] {
+  if (!multiYayasan(data)) return data.per_vihara;
+  return data.per_vihara.map((v) => ({
+    ...v,
+    vihara: { ...v.vihara, name: `${v.vihara.name} (${v.vihara.yayasan_code ?? "-"})` },
+  }));
 }
 
 // Warna identitas vihara — peta kode ala mockup; fallback palet by index

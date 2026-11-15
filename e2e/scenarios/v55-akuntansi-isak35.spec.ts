@@ -205,7 +205,7 @@ test.describe("v55 akuntansi ISAK 35", () => {
 
   // ── FV-53 & FV-54 ────────────────────────────────────────────────────────
 
-  test("FV-53: jurnal manual bisa diajukan, disetujui, dan masuk laporan", async () => {
+  test("FV-53/FV-68: jurnal manual diposting langsung dan masuk laporan", async () => {
     const buat = await apiCall<Dibuat>(admin, "/api/journal-entries", {
       method: "POST",
       body: JSON.stringify({
@@ -229,12 +229,7 @@ test.describe("v55 akuntansi ISAK 35", () => {
     // Draft belum berpengaruh ke laporan.
     expect(n(sebelum.posisi.total_aset)).toBeDefined();
 
-    const ajukan = await apiCall<Dibuat>(admin, `/api/journal-entries/${id}/submit`, {
-      method: "POST",
-    });
-    expect(ajukan.status).toBe(200);
-    expect(ajukan.body.status).toBe("submitted");
-
+    // FV-68: tanpa pengajuan — pemegang journal.approve langsung memposting.
     const setujui = await apiCall<Dibuat & { posted_by_user_id: number }>(
       admin,
       `/api/journal-entries/${id}/post`,
@@ -242,7 +237,7 @@ test.describe("v55 akuntansi ISAK 35", () => {
     );
     expect(setujui.status).toBe(200);
     expect(setujui.body.status).toBe("posted");
-    expect(setujui.body.posted_by_user_id, "penyetuju tercatat").toBeTruthy();
+    expect(setujui.body.posted_by_user_id, "pemosting tercatat").toBeTruthy();
 
     // FV-54: akun 3100 ikut terbaca, jadi asetnya bertambah DAN aset netonya
     // juga — laporan tetap seimbang.
@@ -261,14 +256,15 @@ test.describe("v55 akuntansi ISAK 35", () => {
     expect(hapus.status).toBe(422);
   });
 
-  test("FV-53: jurnal tidak seimbang ditolak saat diajukan", async () => {
-    const buat = await apiCall<Dibuat>(admin, "/api/journal-entries", {
+  test("FV-68: jurnal manual langsung diposting dari form, tanpa pengajuan", async () => {
+    const buat = await apiCall<Dibuat & { posted_by_user_id: number }>(admin, "/api/journal-entries", {
       method: "POST",
       body: JSON.stringify({
         entity_id: entityVvg,
         vihara_id: viharaVvg,
         entry_date: HARI_INI(),
-        description: uniq("v55 timpang"),
+        description: uniq("v55 posting langsung"),
+        posting: true,
         lines: [
           { account_code: "1120", debit: 1000, credit: 0 },
           { account_code: "3100", debit: 0, credit: 1000 },
@@ -277,28 +273,15 @@ test.describe("v55 akuntansi ISAK 35", () => {
     });
     expect(buat.status).toBe(201);
     jurnalDibuat.push(buat.body.id);
-    // Jurnalnya seimbang; yang diuji di sini penolakan ganda: jurnal yang
-    // SUDAH diajukan tidak bisa diajukan lagi.
-    expect((await apiCall(admin, `/api/journal-entries/${buat.body.id}/submit`, { method: "POST" })).status).toBe(200);
-    const lagi = await apiCall<{ message?: string }>(
-      admin,
-      `/api/journal-entries/${buat.body.id}/submit`,
-      { method: "POST" },
-    );
-    expect(lagi.status).toBe(422);
+    expect(buat.body.status).toBe("posted");
+    expect(buat.body.posted_by_user_id, "pemosting tercatat").toBeTruthy();
 
-    // Ditolak dengan alasan → kembali ke pembuatnya.
-    const tolak = await apiCall<Dibuat & { reject_reason: string }>(
-      admin,
-      `/api/journal-entries/${buat.body.id}/reject`,
-      { method: "POST", body: JSON.stringify({ reason: "Bukti belum dilampirkan" }) },
-    );
-    expect(tolak.status).toBe(200);
-    expect(tolak.body.status).toBe("rejected");
-    expect(tolak.body.reject_reason).toBe("Bukti belum dilampirkan");
+    // Alur pengajuan/penolakan FV-53 sudah tidak ada.
+    const ajukan = await apiCall(admin, `/api/journal-entries/${buat.body.id}/submit`, { method: "POST" });
+    expect([404, 405]).toContain(ajukan.status);
   });
 
-  test("FV-53: tombol siklus ada di layar Jurnal", async ({ page }) => {
+  test("FV-68: tombol Ubah/Posting/Hapus di layar Jurnal, tanpa Ajukan", async ({ page }) => {
     const buat = await apiCall<Dibuat>(admin, "/api/journal-entries", {
       method: "POST",
       body: JSON.stringify({
@@ -316,13 +299,14 @@ test.describe("v55 akuntansi ISAK 35", () => {
 
     await login(page, "admin");
     await page.goto("/jurnal");
-    const ajukan = page.getByTestId(`ajukan-je-${buat.body.id}`);
-    await expect(ajukan).toBeVisible({ timeout: 20_000 });
-    await ajukan.click();
+    const posting = page.getByTestId(`posting-je-${buat.body.id}`);
+    await expect(posting).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId(`ubah-je-${buat.body.id}`)).toBeVisible();
+    await expect(page.getByTestId(`hapus-je-${buat.body.id}`)).toBeVisible();
+    await expect(page.locator("[data-testid^=ajukan-je-]")).toHaveCount(0);
 
-    await expect(page.getByTestId(`posting-je-${buat.body.id}`)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId(`tolak-je-${buat.body.id}`)).toBeVisible();
-    await page.getByTestId(`posting-je-${buat.body.id}`).click();
+    await posting.click();
+    await page.getByTestId("dialog-konfirmasi").click();
 
     await expect
       .poll(
@@ -477,7 +461,6 @@ test.describe("v55 akuntansi ISAK 35", () => {
       });
       expect(je.status).toBe(201);
       jurnalDibuat.push(je.body.id);
-      await apiCall(admin, `/api/journal-entries/${je.body.id}/submit`, { method: "POST" });
       expect((await apiCall(admin, `/api/journal-entries/${je.body.id}/post`, { method: "POST" })).status).toBe(200);
 
       const lap = await laporan();

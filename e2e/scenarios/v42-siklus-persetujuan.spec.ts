@@ -164,8 +164,10 @@ test.describe("v42 siklus persetujuan", () => {
     const baris = page.locator("tbody tr").filter({ hasText: bukti }).first();
     await expect(baris).toBeVisible({ timeout: 10_000 });
 
-    page.once("dialog", (d) => d.accept("Nominal tidak sesuai kuitansi"));
     await baris.locator('[data-testid^="tolak-"]').click();
+    // FV-70: alasan diisi di dialog aplikasi, bukan window.prompt.
+    await page.getByTestId("dialog-isian").fill("Nominal tidak sesuai kuitansi");
+    await page.getByTestId("dialog-konfirmasi").click();
     await expect(page.getByText(/ditolak dan dikembalikan/)).toBeVisible({ timeout: 10_000 });
 
     const sesudah = await apiCall<Baris>(tokenAdmin, `/api/pembayaran/${idDraft}`);

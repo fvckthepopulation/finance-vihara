@@ -76,7 +76,7 @@ test.describe("v48 jurnal: yayasan, vihara, format rupiah", () => {
     await login(page, "admin");
     await bukaForm(page);
 
-    const modal = page.locator("form").filter({ hasText: "Manual Journal Entry" });
+    const modal = page.locator("form").filter({ hasText: "Jurnal Manual Baru" }); // judul baru sejak FV-68
     await expect(modal).toContainText("Yayasan");
     await expect(modal).not.toContainText("Entitas");
   });
@@ -158,12 +158,12 @@ test.describe("v48 jurnal: yayasan, vihara, format rupiah", () => {
     await page.getByLabel("Kredit baris 2").fill("15000000");
 
     // Pemilih akun ada di dalam tabel baris form, bukan di saringan halaman.
-    const formJurnal = page.locator("form").filter({ hasText: "Manual Journal Entry" });
+    const formJurnal = page.locator("form").filter({ hasText: "Jurnal Manual Baru" }); // judul baru sejak FV-68
     const akun = formJurnal.locator("tbody select");
     await akun.nth(0).selectOption({ index: 1 });
     await akun.nth(1).selectOption({ index: 2 });
 
-    await page.getByRole("button", { name: "Simpan draft" }).click();
+    await page.getByTestId("je-simpan-draft").click(); // "Simpan sebagai Draft" (FV-68)
     // Formnya tertutup, lalu barisnya muncul di tabel daftar (tbody pertama).
     await expect(formJurnal).toHaveCount(0, { timeout: 15_000 });
     await expect(page.locator("tbody").first()).toContainText(ket, { timeout: 15_000 });
@@ -181,11 +181,16 @@ test.describe("v48 jurnal: yayasan, vihara, format rupiah", () => {
 
   test("FV-34 & FV-35: server menolak yayasan/vihara di luar jangkauan", async () => {
     const vihara = await viharaIdsByCode();
-    const akun = await apiCall<Array<{ code: string }>>(
+    const akun = await apiCall<Array<{ code: string; is_header?: boolean }>>(
       token,
       "/api/coa?active=true&per_page=100",
     );
-    const kodeAkun = (Array.isArray(akun.body) ? akun.body : []).slice(0, 2).map((a) => a.code);
+    // Akun induk (header) ditolak server sejak FV-68 — laporan tidak membaca
+    // saldo akun induk, jadi jurnalnya akan hilang dari laporan.
+    const kodeAkun = (Array.isArray(akun.body) ? akun.body : [])
+      .filter((a) => !a.is_header)
+      .slice(0, 2)
+      .map((a) => a.code);
 
     const body = (viharaId: number) => ({
       entity_id: 1,

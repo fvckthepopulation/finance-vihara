@@ -143,7 +143,7 @@ test.describe("v41 jurnal & detail", () => {
     expect(kotak!.height, "tinggi area klik minimal 32px").toBeGreaterThanOrEqual(32);
   });
 
-  test("FV-18: jurnal menyebut sumber, vihara, dan membuka transaksinya", async ({ page }) => {
+  test("FV-18/FV-67: jurnal menyebut sumber, vihara, dan bukti transaksinya", async ({ page }) => {
     await login(page, "admin");
     await page.goto("/jurnal");
 
@@ -159,9 +159,11 @@ test.describe("v41 jurnal & detail", () => {
     await expect(baris).toContainText("Toko Fotocopy");
     await expect(baris).toContainText("Vipassan");
 
-    // Dan dari situ transaksi sumbernya bisa dibuka.
-    await baris.locator('[data-testid^="sumber-je-"]').click();
-    const modal = page.getByTestId("detail-pengeluaran");
+    // FV-67: tombol "Transaksi" dihapus — kolom Aksi seragam di semua
+    // sumber. Bukti transaksi sumbernya tampil di Detail jurnal.
+    await expect(baris.locator('[data-testid^="sumber-je-"]')).toHaveCount(0);
+    await baris.getByRole("button", { name: "Detail" }).click();
+    const modal = page.getByText(/^JE #\d+$/).locator("xpath=ancestor::div[contains(@class,'fixed')][1]");
     await expect(modal).toBeVisible({ timeout: 10_000 });
     await expect(modal).toContainText(bukti);
   });

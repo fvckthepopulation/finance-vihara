@@ -25,6 +25,7 @@ import {
   matchLine,
 } from "@/lib/reconciliation";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 const fmtRp = (n: string | number | null | undefined) =>
   "Rp " + Math.round(num(n)).toLocaleString("id-ID");
@@ -445,6 +446,14 @@ function UnmatchedKoranRow({
   const [loadingSug, setLoadingSug] = useState(false);
 
   async function handleDelete() {
+    // Dulu langsung terhapus tanpa konfirmasi (temuan saat uji FV-70).
+    const ya = await dialog.confirm({
+      title: "Hapus item rekening koran",
+      message: "Item ini dihapus dari rekonsiliasi dan tidak bisa dikembalikan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+    });
+    if (!ya) return;
     setBusy(true);
     onError(null);
     try {

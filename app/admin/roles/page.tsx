@@ -17,6 +17,7 @@ import { Card, CardHeader } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import { Field, Input } from "@/components/Field";
 import { Pagination, usePaginasiLokal } from "@/components/Pagination";
+import { dialog } from "@/components/Dialog";
 
 // Nama role dipakai sebagai kunci di Spatie + dirujuk di kode (mis.
 // `can('roles.manage')` lewat role). Karena itu formatnya dibatasi:
@@ -53,20 +54,15 @@ export default function AdminRolesPage() {
   useEffect(reload, [cari]);
 
   async function handleDelete(r: AdminRole) {
-    if (
-      !confirm(
-        `Hapus role "${r.name}"?\n\nPermission-nya ikut hilang dan tindakan ini tidak bisa dibatalkan.`,
-      )
-    ) {
-      return;
-    }
     setError(null);
-    try {
-      await deleteRole(r.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menghapus role");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus role "${r.name}"`,
+      message: "Permission-nya ikut hilang dan tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteRole(r.id),
+    });
+    if (ya) reload();
   }
 
   // Pencariannya sudah di server; pemotongan halaman di peramban karena daftar

@@ -23,6 +23,7 @@ import {
 import { fmtTanggal } from "@/lib/tanggal";
 import { useAuth } from "@/lib/useAuth";
 import { getMyScope, ScopeVihara } from "@/lib/api";
+import { dialog } from "@/components/Dialog";
 
 // ============================================================================
 // Persetujuan transaksi.
@@ -152,26 +153,18 @@ export default function PersetujuanPage() {
   }
 
   async function tolak(r: TransactionRow) {
-    const alasan = window.prompt(
-      `Tolak ${r.code}?\n\nTransaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
-    );
-    if (alasan == null) return;
-    if (alasan.trim().length < 3) {
-      setError("Alasan penolakan terlalu singkat.");
-      return;
-    }
-    setBusy(r.id);
     setError(null);
-    try {
-      if (r.tipe === "Pengeluaran") await rejectPembayaran(r.id, alasan.trim());
-      else await rejectPenerimaan(r.id, alasan.trim());
-      setToast(`${r.code} ditolak dan dikembalikan ke pengaju`);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menolak");
-    } finally {
-      setBusy(null);
-    }
+    const alasan = await dialog.prompt({
+      title: `Tolak ${r.code}`,
+      message: "Transaksi dikembalikan ke pengajunya beserta alasan ini, tidak dihapus.",
+      label: "Alasan penolakan",
+      confirmLabel: "Tolak",
+      tone: "danger",
+      action: (a) => (r.tipe === "Pengeluaran" ? rejectPembayaran(r.id, a) : rejectPenerimaan(r.id, a)),
+    });
+    if (alasan == null) return;
+    setToast(`${r.code} ditolak dan dikembalikan ke pengaju`);
+    reload();
   }
 
   const adaFilterTerpakai = JSON.stringify(f) !== JSON.stringify(KOSONG);

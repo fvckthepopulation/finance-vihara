@@ -107,6 +107,7 @@ function IsiPenerimaan() {
   const router = useRouter();
   const draftParam = useSearchParams().get("draft");
   const draftId = draftParam ? Number(draftParam) : null;
+  const formRef = useRef<HTMLFormElement>(null);
   const [draftKode, setDraftKode] = useState<string | null>(null);
   const [draftLampiran, setDraftLampiran] = useState<string | null>(null);
   const [memuatDraft, setMemuatDraft] = useState(false);
@@ -174,6 +175,10 @@ function IsiPenerimaan() {
     if (draftId == null) return;
     let alive = true;
     setMemuatDraft(true);
+    // Bawa user ke form draft, bukan tetap di posisi gulir sebelumnya (FV-69).
+    // Wadah konten AppShell yang menggulir, bukan window — jadi gulirkan
+    // form-nya sendiri ke atas layar.
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     getPenerimaan(draftId)
       .then((d) => {
         if (!alive) return;
@@ -334,7 +339,7 @@ function IsiPenerimaan() {
     >
       {toast && <Toast message={toast} tone="success" onClose={() => setToast(null)} />}
 
-      <form onSubmit={(e) => e.preventDefault()}>
+      <form ref={formRef} onSubmit={(e) => e.preventDefault()}>
         <Card>
           <CardHeader
             title={draftKode ? `Ubah Draft ${draftKode}` : "Input Penerimaan Dana"}
@@ -531,7 +536,15 @@ function IsiPenerimaan() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => (draftId != null ? router.push("/penerimaan/daftar") : resetForm())}
+              // Batal: keluar dari mode ubah draft ke form input baru, draft tidak berubah (FV-69).
+              onClick={() => {
+                resetForm();
+                if (draftId != null) {
+                  setDraftKode(null);
+                  setDraftLampiran(null);
+                  router.replace("/penerimaan");
+                }
+              }}
               data-testid={draftId != null ? "tombol-batal" : "tombol-reset"}
             >
               {draftId != null ? "Batal" : "Reset"}

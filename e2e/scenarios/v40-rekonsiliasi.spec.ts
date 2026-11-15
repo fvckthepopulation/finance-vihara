@@ -285,6 +285,8 @@ test.describe("v40 rekonsiliasi", () => {
     const onlyKoran = page.getByTestId("only-koran");
     await expect(onlyKoran).toContainText(orphanDesc, { timeout: 15_000 });
     await page.getByLabel(`Hapus item ${orphanDesc}`).click();
+    // Hapus item koran kini meminta konfirmasi (dialog aplikasi).
+    await page.getByTestId("dialog-konfirmasi").click();
     await expect(page.getByText("Item rekening koran dihapus")).toBeVisible({ timeout: 15_000 });
     await expect(onlyKoran).not.toContainText(orphanDesc, { timeout: 15_000 });
   });

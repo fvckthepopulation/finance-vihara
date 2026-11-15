@@ -22,6 +22,7 @@ import {
 } from "@/lib/transactions";
 import { useAuth } from "@/lib/useAuth";
 import { useVihara } from "@/lib/useVihara";
+import { dialog } from "@/components/Dialog";
 
 const fmtRp = (n: string | number) =>
   "Rp " + Math.round(typeof n === "string" ? Number(n) : n).toLocaleString("id-ID");
@@ -478,23 +479,17 @@ function BatalkanButton({
   }
 
   async function batalkan() {
-    const alasan = window.prompt(
-      `Batalkan ${row.code}?\n\nTransaksi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
-    );
-    if (alasan == null) return;
-    if (alasan.trim().length < 3) {
-      onError("Alasan pembatalan terlalu singkat.");
-      return;
-    }
     setPending(true);
-    try {
-      await voidTransaction(row, alasan.trim());
-      onDone();
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "Gagal membatalkan transaksi");
-    } finally {
-      setPending(false);
-    }
+    const alasan = await dialog.prompt({
+      title: `Batalkan ${row.code}`,
+      message: "Transaksi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.",
+      label: "Alasan pembatalan",
+      confirmLabel: "Batalkan Transaksi",
+      tone: "danger",
+      action: (a) => voidTransaction(row, a),
+    });
+    setPending(false);
+    if (alasan != null) onDone();
   }
 
   return (

@@ -27,6 +27,7 @@ import {
 } from "@/lib/pettyCash";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 const fmtRp = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
 const fmtTgl = (iso: string) =>
@@ -148,23 +149,16 @@ export default function PettyCashPage() {
   }, [summary, pics]);
 
   async function handleVoid(r: { id: number }) {
-    const alasan = window.prompt(
-      `Batalkan mutasi kas kecil #${r.id}?\n\nMutasi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
-    );
+    const alasan = await dialog.prompt({
+      title: `Batalkan mutasi kas kecil #${r.id}`,
+      message: "Mutasi TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.",
+      label: "Alasan pembatalan",
+      confirmLabel: "Batalkan Mutasi",
+      tone: "danger",
+      action: (a) => voidPettyCashMovement(r.id, a),
+    });
     if (alasan == null) return;
-    if (alasan.trim().length < 3) {
-      setToast({ message: "Alasan pembatalan terlalu singkat.", tone: "error" });
-      return;
-    }
-    try {
-      await voidPettyCashMovement(r.id, alasan.trim());
-      afterSaved("Mutasi kas kecil dibatalkan");
-    } catch (e) {
-      setToast({
-        message: e instanceof Error ? e.message : "Gagal membatalkan mutasi",
-        tone: "error",
-      });
-    }
+    afterSaved("Mutasi kas kecil dibatalkan");
   }
 
   function afterSaved(message: string) {

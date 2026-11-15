@@ -203,11 +203,10 @@ test.describe("v49 lanjut draft", () => {
     await page.getByTestId("filter-cari").fill(catatan);
     await page.getByTestId(`no-transaksi-${d.id}`).click();
 
-    page.once("dialog", (dialog) => {
-      expect(dialog.message()).toContain("tidak bisa dibatalkan");
-      dialog.accept();
-    });
     await page.getByTestId("hapus-draft").click();
+    // FV-70: konfirmasi memakai dialog aplikasi, bukan window.confirm.
+    await expect(page.getByTestId("dialog-aplikasi")).toContainText("tidak bisa dibatalkan");
+    await page.getByTestId("dialog-konfirmasi").click();
 
     await expect(page.getByTestId("detail-pengeluaran")).toHaveCount(0, { timeout: 15_000 });
     const sesudah = await apiCall(bendahara, `/api/pembayaran/${d.id}`);

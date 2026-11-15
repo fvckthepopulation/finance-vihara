@@ -37,6 +37,7 @@ import {
   updateNama,
 } from "@/lib/masterTransaksi";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 // ============================================================================
 // Layar master transaksi dua tingkat — dipakai Master Pengeluaran (FV-29) DAN
@@ -213,33 +214,35 @@ function TabelKategori({
       // Masih punya nama aktif → tawarkan menonaktifkan semuanya sekaligus,
       // bukan berhenti dengan pesan error saja.
       // Pesan server: "Kategori masih punya N Nama <jenis> aktif."
-      if (
-        /masih punya .* aktif/i.test(pesan) &&
-        window.confirm(`${pesan}\n\nNonaktifkan semuanya sekarang?`)
-      ) {
-        try {
-          await updateKategori(L.jenis, k.id, { active: false, nonaktifkan_anak: true });
+      if (/masih punya .* aktif/i.test(pesan)) {
+        const ya = await dialog.confirm({
+          title: `Nonaktifkan kategori ${k.name}`,
+          message: `${pesan}\n\nNonaktifkan kategori beserta semua namanya sekarang?`,
+          confirmLabel: "Nonaktifkan Semua",
+          tone: "amber",
+          action: () => updateKategori(L.jenis, k.id, { active: false, nonaktifkan_anak: true }),
+        });
+        if (ya) {
           onToast({ message: "Kategori dan seluruh namanya dinonaktifkan", tone: "success" });
           onBerubah();
-          return;
-        } catch (e2) {
-          onToast({ message: e2 instanceof Error ? e2.message : pesan, tone: "error" });
-          return;
         }
+        return;
       }
       onToast({ message: pesan, tone: "error" });
     }
   }
 
   async function hapus(k: KategoriTransaksi) {
-    if (!window.confirm(`Hapus kategori ${k.name}?`)) return;
-    try {
-      await deleteKategori(L.jenis, k.id);
-      onToast({ message: "Kategori dihapus", tone: "success" });
-      onBerubah();
-    } catch (e) {
-      onToast({ message: e instanceof Error ? e.message : "Gagal menghapus", tone: "error" });
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus kategori ${k.name}`,
+      message: "Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteKategori(L.jenis, k.id),
+    });
+    if (!ya) return;
+    onToast({ message: "Kategori dihapus", tone: "success" });
+    onBerubah();
   }
 
   const rows = res?.data ?? [];
@@ -624,14 +627,16 @@ function TabelNama({
   }
 
   async function hapus(n: NamaTransaksi) {
-    if (!window.confirm(`Hapus ${L.namaKecil} ${n.name}?`)) return;
-    try {
-      await deleteNama(L.jenis, n.id);
-      onToast({ message: `${L.nama} dihapus`, tone: "success" });
-      onBerubah();
-    } catch (e) {
-      onToast({ message: e instanceof Error ? e.message : "Gagal menghapus", tone: "error" });
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus ${L.namaKecil} ${n.name}`,
+      message: "Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteNama(L.jenis, n.id),
+    });
+    if (!ya) return;
+    onToast({ message: `${L.nama} dihapus`, tone: "success" });
+    onBerubah();
   }
 
   const rows = res?.data ?? [];

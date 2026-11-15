@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Badge } from "@/components/Badge";
@@ -9,7 +9,6 @@ import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
 import { YayasanViharaFields, YayasanViharaValue } from "@/components/YayasanViharaFields";
 import { fmtTanggal } from "@/lib/tanggal";
-import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { Modal } from "@/components/Modal";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { CoaAccount, listCoa } from "@/lib/coa";
@@ -24,11 +23,11 @@ import {
   journalSourceLabel,
   listJournalEntries,
   postJournalEntry,
-  rejectJournalEntry,
-  submitJournalEntry,
+  updateJournalEntry,
   unduhJurnalExcel,
 } from "@/lib/journal";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 /**
  * Keadaan jurnal manual sesudah FV-53. Sengaja memakai sebutan yang sama
@@ -57,11 +56,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 type SourceFilter = "" | keyof typeof JOURNAL_SOURCE_LABEL;
 
+/** Status jurnal manual yang masih boleh diubah, diposting, dan dihapus. */
+const BELUM_POSTING = ["draft", "submitted", "rejected"];
+
 export default function JurnalPage() {
   const { can } = useAuth();
   const canCreate = can("journal.create");
   const canVoid = can("journal.void");
   const canApprove = can("journal.approve");
+  // JE manual yang sedang diubah (FV-68).
+  const [editId, setEditId] = useState<number | null>(null);
   const bisaExport = can("reports.export");
   const [mengunduh, setMengunduh] = useState(false);
 
@@ -100,8 +104,6 @@ export default function JurnalPage() {
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [viewId, setViewId] = useState<number | null>(null);
-  // FV-18 poin 4: dari jurnal bisa membuka detail transaksi sumbernya.
-  const [sumberId, setSumberId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const [meta, setMeta] = useState({
@@ -149,64 +151,41 @@ export default function JurnalPage() {
   }, []);
 
   async function handleVoid(r: { id: number }) {
-    const alasan = window.prompt(
-      `Batalkan JE #${r.id}?\n\nJurnal TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.\n\nAlasan pembatalan:`,
-    );
+    const alasan = await dialog.prompt({
+      title: `Batalkan JE #${r.id}`,
+      message: "Jurnal TIDAK dihapus: sistem membuat jurnal pembalik dan menandainya dibatalkan.",
+      label: "Alasan pembatalan",
+      confirmLabel: "Batalkan Jurnal",
+      tone: "danger",
+      action: (a) => voidJournalEntry(r.id, a),
+    });
     if (alasan == null) return;
-    if (alasan.trim().length < 3) {
-      setError("Alasan pembatalan terlalu singkat.");
-      return;
-    }
-    try {
-      await voidJournalEntry(r.id, alasan.trim());
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal membatalkan jurnal");
-    }
+    reload();
   }
 
-  // Siklus persetujuan jurnal manual (FV-53). Pola tombolnya menyamai
-  // pengeluaran: pencatat mengajukan, penyetuju memposting atau menolak, dan
-  // pemegang kedua izin boleh langsung memposting draftnya sendiri.
-  async function handleAjukan(r: JournalEntryRow) {
-    try {
-      await submitJournalEntry(r.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal mengajukan jurnal");
-    }
-  }
-
+  // Jurnal manual tanpa pengajuan/persetujuan (FV-68): pemegang
+  // journal.approve memposting langsung dari draft.
   async function handlePost(r: JournalEntryRow) {
-    try {
-      await postJournalEntry(r.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal memposting jurnal");
-    }
-  }
-
-  async function handleReject(r: JournalEntryRow) {
-    const alasan = window.prompt(
-      `Tolak jurnal #${r.id}?\n\nJurnal dikembalikan ke pembuatnya beserta alasan ini, tidak dihapus.\n\nAlasan penolakan:`,
-    );
-    if (alasan === null) return;
-    try {
-      await rejectJournalEntry(r.id, alasan.trim());
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal menolak jurnal");
-    }
+    const ya = await dialog.confirm({
+      title: `Posting JE #${r.id}`,
+      message:
+        "Jurnal langsung masuk ke buku besar dan laporan. Setelah diposting, jurnal hanya bisa dibatalkan lewat jurnal pembalik.",
+      confirmLabel: "Posting Jurnal",
+      tone: "success",
+      action: () => postJournalEntry(r.id),
+    });
+    if (ya) reload();
   }
 
   async function handleDelete(r: JournalEntryRow) {
-    if (!confirm(`Hapus draft JE #${r.id}? Hanya draft manual yang bisa dihapus.`)) return;
-    try {
-      await deleteJournalEntry(r.id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal hapus");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus draft JE #${r.id}`,
+      message: "Hanya draft manual yang bisa dihapus. Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteJournalEntry(r.id),
+    });
+    if (ya) reload();
   }
 
   return (
@@ -365,56 +344,33 @@ export default function JurnalPage() {
                     >
                       Detail
                     </Button>
-                    {r.source?.type === "pembayaran" && (
+                    {/* Tombol Transaksi dihapus (FV-67): kolom Aksi seragam di semua sumber. */}
+                    {/* Jurnal manual belum diposting (FV-68): Ubah, Posting
+                        (bagi pemegang journal.approve), Hapus — tanpa
+                        Ajukan/Tolak. submitted/rejected = sisa alur FV-53. */}
+                    {canCreate && r.reference_type === "manual" && BELUM_POSTING.includes(r.status) && (
                       <Button
                         size="sm"
                         variant="default"
                         className="min-h-[32px]"
-                        onClick={() => setSumberId(r.source!.id)}
-                        data-testid={`sumber-je-${r.id}`}
+                        onClick={() => setEditId(r.id)}
+                        data-testid={`ubah-je-${r.id}`}
                       >
-                        Transaksi
+                        Ubah
                       </Button>
                     )}
-                    {canCreate &&
-                      r.reference_type === "manual" &&
-                      ["draft", "rejected"].includes(r.status) && (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          className="min-h-[32px]"
-                          onClick={() => handleAjukan(r)}
-                          data-testid={`ajukan-je-${r.id}`}
-                        >
-                          Ajukan
-                        </Button>
-                      )}
-                    {canApprove &&
-                      r.reference_type === "manual" &&
-                      (r.status === "submitted" ||
-                        (r.status === "draft" && canCreate)) && (
-                        <Button
-                          size="sm"
-                          variant="success"
-                          className="min-h-[32px]"
-                          onClick={() => handlePost(r)}
-                          data-testid={`posting-je-${r.id}`}
-                        >
-                          {r.status === "submitted" ? "Setujui" : "Posting"}
-                        </Button>
-                      )}
-                    {canApprove && r.reference_type === "manual" && r.status === "submitted" && (
+                    {canApprove && r.reference_type === "manual" && BELUM_POSTING.includes(r.status) && (
                       <Button
                         size="sm"
-                        variant="default"
+                        variant="success"
                         className="min-h-[32px]"
-                        onClick={() => handleReject(r)}
-                        data-testid={`tolak-je-${r.id}`}
+                        onClick={() => handlePost(r)}
+                        data-testid={`posting-je-${r.id}`}
                       >
-                        Tolak
+                        Posting
                       </Button>
                     )}
-                    {canCreate && r.reference_type === "manual" && r.status === "draft" && (
+                    {canCreate && r.reference_type === "manual" && BELUM_POSTING.includes(r.status) && (
                       <Button
                         size="sm"
                         variant="danger"
@@ -459,12 +415,19 @@ export default function JurnalPage() {
         </div>
       </Card>
 
-      {showForm && (
+      {(showForm || editId != null) && (
         <ManualJournalForm
+          key={editId ?? "baru"}
           accounts={accounts}
-          onClose={() => setShowForm(false)}
+          editId={editId}
+          canPost={canApprove}
+          onClose={() => {
+            setShowForm(false);
+            setEditId(null);
+          }}
           onSaved={() => {
             setShowForm(false);
+            setEditId(null);
             reload();
           }}
         />
@@ -472,9 +435,6 @@ export default function JurnalPage() {
 
       {viewId != null && (
         <ViewJournalModal id={viewId} onClose={() => setViewId(null)} />
-      )}
-      {sumberId != null && (
-        <PembayaranDetail id={sumberId} onClose={() => setSumberId(null)} />
       )}
     </AppShell>
   );
@@ -494,13 +454,21 @@ type LineDraft = {
 const blankLine = (): LineDraft => ({ account_code: "", debit: "", credit: "", description: "" });
 
 function ManualJournalForm({
-  accounts, onClose, onSaved,
+  accounts, editId, canPost, onClose, onSaved,
 }: {
   accounts: CoaAccount[];
+  /** Diisi = ubah jurnal manual yang belum diposting (FV-68). */
+  editId: number | null;
+  /** Pemegang journal.approve: tombol Posting Jurnal tampil. */
+  canPost: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [scope, setScope] = useState<YayasanViharaValue>({ entityId: null, viharaId: null });
+  const [memuat, setMemuat] = useState(editId != null);
+  // Tombol mana yang menekan submit: draft atau posting.
+  const postingRef = useRef(false);
+  const [sedangPosting, setSedangPosting] = useState(false);
   const [entryDate, setEntryDate] = useState(today());
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState("");
@@ -512,6 +480,33 @@ function ManualJournalForm({
     () => accounts.filter((a) => a.active && !a.is_header).sort((a, b) => a.code.localeCompare(b.code)),
     [accounts],
   );
+
+  // Mode ubah: isi form dari jurnal yang tersimpan.
+  useEffect(() => {
+    if (editId == null) return;
+    let alive = true;
+    getJournalEntry(editId)
+      .then((je) => {
+        if (!alive) return;
+        setScope({ entityId: je.entity_id, viharaId: je.vihara?.id ?? null });
+        setEntryDate(String(je.entry_date).slice(0, 10));
+        setDescription(je.description ?? "");
+        setReference(je.reference ?? "");
+        setLines(
+          je.lines.map((l) => ({
+            account_code: l.account_code,
+            debit: Number(l.debit) > 0 ? String(Number(l.debit)) : "",
+            credit: Number(l.credit) > 0 ? String(Number(l.credit)) : "",
+            description: l.description ?? "",
+          })),
+        );
+      })
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "Gagal memuat jurnal"))
+      .finally(() => alive && setMemuat(false));
+    return () => {
+      alive = false;
+    };
+  }, [editId]);
 
   const totalDebit = lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
   const totalCredit = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
@@ -529,10 +524,24 @@ function ManualJournalForm({
     if (!scope.entityId) { setError("Pilih yayasan dulu."); return; }
     if (!scope.viharaId) { setError("Pilih vihara dulu."); return; }
     if (!balanced) { setError("Jurnal belum balance / total 0."); return; }
+    const posting = postingRef.current;
+    postingRef.current = false;
+    if (posting) {
+      const ya = await dialog.confirm({
+        title: "Posting jurnal",
+        message:
+          "Jurnal langsung masuk ke buku besar dan laporan. Setelah diposting, jurnal hanya bisa dibatalkan lewat jurnal pembalik.",
+        confirmLabel: "Posting Jurnal",
+        tone: "success",
+      });
+      if (!ya) return;
+    }
     setError(null);
+    setSedangPosting(posting);
     setPending(true);
     try {
       const payload: CreateJournalEntryPayload = {
+        posting,
         entity_id: scope.entityId,
         vihara_id: scope.viharaId,
         entry_date: entryDate,
@@ -545,7 +554,8 @@ function ManualJournalForm({
           description: l.description.trim() || undefined,
         })),
       };
-      await createJournalEntry(payload);
+      if (editId != null) await updateJournalEntry(editId, payload);
+      else await createJournalEntry(payload);
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal simpan");
@@ -556,16 +566,35 @@ function ManualJournalForm({
 
   return (
     <Modal
-      title={"Manual Journal Entry"}
+      title={editId != null ? `Ubah Jurnal Manual JE #${editId}` : "Jurnal Manual Baru"}
       onClose={onClose}
       onSubmit={submit}
       width="max-w-3xl"
       footer={
         <>
           <Button type="button" variant="default" onClick={onClose}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={pending || !balanced}>
-            {pending ? "Menyimpan…" : "Simpan draft"}
+          <Button
+            type="submit"
+            variant={canPost ? "default" : "primary"}
+            disabled={pending || memuat || !balanced}
+            onClick={() => (postingRef.current = false)}
+            data-testid="je-simpan-draft"
+          >
+            {pending && !sedangPosting ? "Menyimpan…" : "Simpan sebagai Draft"}
           </Button>
+          {/* Hanya pemegang journal.approve; server tetap menolak (403)
+              bila izin itu tidak ada (FV-68). */}
+          {canPost && (
+            <Button
+              type="submit"
+              variant="success"
+              disabled={pending || memuat || !balanced}
+              onClick={() => (postingRef.current = true)}
+              data-testid="je-posting"
+            >
+              {pending && sedangPosting ? "Memposting…" : "Posting Jurnal"}
+            </Button>
+          )}
         </>
       }
     >

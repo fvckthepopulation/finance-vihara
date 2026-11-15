@@ -172,7 +172,12 @@ export type KasBankMutasi = {
 
 export type KasBankData = {
   bank_accounts: KasBankAccount[];
-  kas_kecil: { pics: { id: number; name: string; saldo: string | number }[]; total: string | number };
+  kas_kecil: {
+    pics: { id: number; name: string; saldo: string | number }[];
+    total: string | number;
+    /** Akun COA kas kecil dari bagan akun (FV-73). */
+    akun?: { code: string; name: string } | null;
+  };
   /**
    * Kas tunai (1115) — kartu tersendiri sejak FV-52, dengan rincian per
    * vihara karena uang tunai dipegang masing-masing vihara.

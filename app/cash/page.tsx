@@ -300,7 +300,13 @@ export default function KasBankPage() {
               <div className="mb-2.5 flex items-start justify-between">
                 <div>
                   <p className="text-[10px] uppercase tracking-[.06em] text-km-ink-muted">Kas Kecil</p>
-                  <p className="mt-0.5 text-[13px] font-semibold text-km-ink">Petty Cash</p>
+                  <p className="mt-0.5 text-[13px] font-semibold text-km-ink">
+                    {data?.kas_kecil.akun?.name ?? "Kas Kecil (Petty Cash)"}
+                  </p>
+                  {/* Kode akun COA, sama seperti kartu Kas Tunai (FV-73). */}
+                  <p className="kode mt-[3px] text-[11px] text-km-ink-muted">
+                    {data?.kas_kecil.akun?.code ?? "1110"}
+                  </p>
                   <p className="mt-[3px] text-[11px] text-km-ink-muted">
                     PIC: {pics.length > 0 ? pics.map((p) => p.name).join(" & ") : "—"}
                   </p>

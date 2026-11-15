@@ -21,6 +21,7 @@ import {
   updatePenerima,
 } from "@/lib/penerima";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 // ============================================================================
 // Master Penerima (FV-31).
@@ -81,14 +82,16 @@ export default function MasterPenerimaPage() {
   }
 
   async function hapus(p: Penerima) {
-    if (!window.confirm(`Hapus penerima ${p.name}?`)) return;
-    try {
-      await deletePenerima(p.id);
-      setToast({ message: "Penerima dihapus", tone: "success" });
-      muat();
-    } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : "Gagal menghapus", tone: "error" });
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus penerima ${p.name}`,
+      message: "Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deletePenerima(p.id),
+    });
+    if (!ya) return;
+    setToast({ message: "Penerima dihapus", tone: "success" });
+    muat();
   }
 
   const rows = res?.data ?? [];

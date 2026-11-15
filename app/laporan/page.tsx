@@ -26,10 +26,9 @@ import {
   getIsak35,
   isak35PeriodLabel,
 } from "@/lib/laporanKeuangan";
+import { useScopeNames } from "@/lib/useScopeNames";
 import { useVihara } from "@/lib/useVihara";
 import { Vihara, listViharas } from "@/lib/vihara";
-
-const YAYASAN = "Yayasan Dhammavihara Indonesia";
 
 // Blok laporan (LapTitle/LapHeader/LapRow/Row3/…) dipakai bersama dengan
 // /konsolidasi — lihat components/ReportRows.tsx.
@@ -56,6 +55,8 @@ export default function LaporanPage() {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
   const { viharaId, ready: viharaReady } = useVihara();
+  // Nama yayasan dari jangkauan akun, bukan ditulis tetap (FV-65).
+  const { yayasan } = useScopeNames();
 
   useEffect(() => {
     listViharas({})
@@ -88,8 +89,8 @@ export default function LaporanPage() {
   const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
   const periodeLabel = isak35PeriodLabel(mode, year, month);
   const vihara = viharaId != null ? viharas.find((v) => v.id === viharaId) : undefined;
-  const org = viharaId == null ? YAYASAN : vihara?.name ?? "";
-  const orgCode = viharaId == null ? "YDI" : vihara?.code ?? "";
+  const org = viharaId == null ? yayasan.name : vihara?.name ?? "";
+  const orgCode = viharaId == null ? yayasan.code : vihara?.code ?? "";
 
   async function handleExport() {
     if (!data || exporting) return;

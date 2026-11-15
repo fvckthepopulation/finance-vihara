@@ -23,6 +23,7 @@ import {
   updateViharaBankAccount,
 } from "@/lib/kasBank";
 import { useAuth } from "@/lib/useAuth";
+import { dialog } from "@/components/Dialog";
 
 // ============================================================================
 // Master Rekening (FV-30).
@@ -103,14 +104,16 @@ export default function MasterRekeningPage_() {
   }
 
   async function hapus(b: MasterRekeningRow) {
-    if (!window.confirm(`Hapus rekening ${b.label}? Tindakan ini tidak bisa dibatalkan.`)) return;
-    try {
-      await deleteViharaBankAccount(b.id);
-      setToast({ message: "Rekening dihapus", tone: "success" });
-      muat();
-    } catch (e) {
-      setToast({ message: e instanceof Error ? e.message : "Gagal menghapus", tone: "error" });
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus rekening ${b.label}`,
+      message: "Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteViharaBankAccount(b.id),
+    });
+    if (!ya) return;
+    setToast({ message: "Rekening dihapus", tone: "success" });
+    muat();
   }
 
   const rows = res?.data ?? [];

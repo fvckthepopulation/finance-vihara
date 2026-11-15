@@ -22,6 +22,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field, Input, Select } from "@/components/Field";
 import { Modal } from "@/components/Modal";
+import { dialog } from "@/components/Dialog";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -78,13 +79,14 @@ export default function AdminUsersPage() {
   }, [search, perPage]);
 
   async function handleDelete(id: number, name: string) {
-    if (!confirm(`Hapus user "${name}"?`)) return;
-    try {
-      await deleteAdminUser(id);
-      reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Gagal hapus");
-    }
+    const ya = await dialog.confirm({
+      title: `Hapus user "${name}"`,
+      message: "User tidak bisa login lagi. Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      tone: "danger",
+      action: () => deleteAdminUser(id),
+    });
+    if (ya) reload();
   }
 
   return (
