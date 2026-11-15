@@ -26,7 +26,7 @@ test.describe("v49 lanjut draft", () => {
     const res = await apiCall<Dibuat>(bendahara, "/api/pembayaran", {
       method: "POST",
       body: JSON.stringify({
-        date: new Date().toISOString().slice(0, 10),
+        date: new Date().toLocaleDateString("en-CA"),
         method: "transfer",
         vihara_id: viharaVvg,
         description: catatan,

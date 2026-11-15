@@ -71,6 +71,8 @@ export type ListTransactionsParams = {
   sumber?: TransactionSource | "";
   status?: TransactionStatus | "";
   vihara_id?: number | null;
+  /** Saring per yayasan (FV-80). */
+  entity_id?: number | null;
   /** Saring menurut pengaju (id pengguna). */
   submitted_by?: number | null;
   page?: number;
@@ -88,6 +90,7 @@ function buildQuery(params: ListTransactionsParams): URLSearchParams {
   if (params.sumber) sp.set("sumber", params.sumber);
   if (params.status) sp.set("status", params.status);
   if (params.vihara_id != null) sp.set("vihara_id", String(params.vihara_id));
+  if (params.entity_id != null) sp.set("entity_id", String(params.entity_id));
   if (params.page) sp.set("page", String(params.page));
   if (params.per_page) sp.set("per_page", String(params.per_page));
   return sp;

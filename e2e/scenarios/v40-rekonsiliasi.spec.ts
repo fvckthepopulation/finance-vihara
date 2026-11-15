@@ -82,6 +82,9 @@ async function seedPenerimaan(
       method: "transfer",
       bank_account_id: opts.bankAccountId,
       category: opts.category,
+      // Nama wajib bila kategorinya punya nama di master (FV-79);
+      // Donasi Belum Teridentifikasi memang tidak punya.
+      ...(opts.category === "dana_operasional" ? { name: "Dana Pepao" } : {}),
       amount: opts.amount,
       source_name: opts.sourceName,
       description: opts.description,

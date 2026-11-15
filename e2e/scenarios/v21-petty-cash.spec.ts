@@ -59,7 +59,7 @@ test.describe("v21 kas kecil", () => {
     await form.getByRole("button", { name: "Catat Pengisian" }).click();
 
     // Toast sukses (pesan longgar — komponen Toast yang sama).
-    await expect(page.getByText(/tercatat/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/kas kecil tercatat/i).first()).toBeVisible({ timeout: 10_000 });
 
     // Riwayat memuat baris Pengisian.
     await expect(
@@ -81,14 +81,16 @@ test.describe("v21 kas kecil", () => {
 
     const form = page.locator("form").filter({ hasText: "Penggunaan Kas Kecil" });
     await selectByLabelRegex(form.getByLabel("PIC Kas Kecil"), /Epi/);
-    // Kategori keperluan wajib sejak FV-58 — akun beban jurnalnya dari sini.
-    await form.getByTestId("kaskecil-kategori").selectOption("operasional");
-    await form.getByLabel("Keperluan", { exact: true }).fill(uniq("E2E-PAKAI"));
+    // Kategori Biaya & Nama Pengeluaran dari master (FV-58, FV-82).
+    await form.getByTestId("kaskecil-kategori").selectOption("biaya_operasional");
+    await expect(form.getByTestId("kaskecil-nama").locator("option").nth(1)).toBeAttached({ timeout: 10_000 });
+    await form.getByTestId("kaskecil-nama").selectOption({ index: 1 });
+    await form.getByTestId("penggunaan-catatan").fill(uniq("E2E-PAKAI"));
     await form.getByLabel("Jumlah (Rp)").fill("11000");
     await form.getByLabel("No. Bukti / Kuitansi").fill(uniq("KWT"));
     await form.getByRole("button", { name: "Catat Penggunaan" }).click();
 
-    await expect(page.getByText(/tercatat/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/kas kecil tercatat/i).first()).toBeVisible({ timeout: 10_000 });
 
     await page.reload();
     await expect.poll(() => readSaldo(page, "Epi"), { timeout: 15_000 }).toBe(before - 11_000);
@@ -104,13 +106,15 @@ test.describe("v21 kas kecil", () => {
     // kalau Lili memang belum punya mutasi, saringan apa pun terlihat "benar".
     const form = page.locator("form").filter({ hasText: "Penggunaan Kas Kecil" });
     await selectByLabelRegex(form.getByLabel("PIC Kas Kecil"), /Lili/);
-    // Kategori keperluan wajib sejak FV-58 — akun beban jurnalnya dari sini.
-    await form.getByTestId("kaskecil-kategori").selectOption("operasional");
-    await form.getByLabel("Keperluan", { exact: true }).fill(uniq("E2E-LILI"));
+    // Kategori Biaya & Nama Pengeluaran dari master (FV-58, FV-82).
+    await form.getByTestId("kaskecil-kategori").selectOption("biaya_operasional");
+    await expect(form.getByTestId("kaskecil-nama").locator("option").nth(1)).toBeAttached({ timeout: 10_000 });
+    await form.getByTestId("kaskecil-nama").selectOption({ index: 1 });
+    await form.getByTestId("penggunaan-catatan").fill(uniq("E2E-LILI"));
     await form.getByLabel("Jumlah (Rp)").fill("9000");
     await form.getByLabel("No. Bukti / Kuitansi").fill(uniq("KWT-LILI"));
     await form.getByRole("button", { name: "Catat Penggunaan" }).click();
-    await expect(page.getByText(/tercatat/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/kas kecil tercatat/i).first()).toBeVisible({ timeout: 10_000 });
 
     const filter = page.getByLabel("Filter PIC");
     await expect(filter).toBeVisible({ timeout: 15_000 });

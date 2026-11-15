@@ -44,6 +44,8 @@ async function seedPenerimaanPerVihara(): Promise<void> {
         date: tanggal,
         method: "tunai",
         category: "dana_paramita",
+        // Nama wajib bila kategorinya punya nama di master (FV-79).
+        name: "Dana Paramita - Dhammasakacca",
         amount: 50_000,
         description: `seed hirarki akses ${code}`,
       }),

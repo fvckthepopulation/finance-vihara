@@ -20,7 +20,9 @@ import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasB
 // dipakai sesuai tujuannya (FV-55).
 // ============================================================================
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Tanggal LOKAL (WIB), bukan UTC: toISOString() memberi tanggal kemarin
+// bila form dibuka antara pukul 00.00 dan 07.00.
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export function TransferRekeningForm({
   viharaId,

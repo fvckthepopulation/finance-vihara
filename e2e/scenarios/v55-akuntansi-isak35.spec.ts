@@ -31,7 +31,7 @@ type Isak35 = {
 };
 
 const n = (v: string) => Number(v);
-const HARI_INI = () => new Date().toISOString().slice(0, 10);
+const HARI_INI = () => new Date().toLocaleDateString("en-CA");
 const BULAN = HARI_INI().slice(0, 7);
 
 test.describe.configure({ mode: "serial" });

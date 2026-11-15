@@ -61,7 +61,9 @@ const METHOD_LABEL: Record<string, string> = {
   auto_credit: "Auto Credit",
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Tanggal LOKAL (WIB), bukan UTC: toISOString() memberi tanggal kemarin
+// bila form dibuka antara pukul 00.00 dan 07.00.
+const today = () => new Date().toLocaleDateString("en-CA");
 
 type Aksi = "draft" | "ajukan" | "submit";
 
@@ -261,6 +263,14 @@ function IsiPenerimaan() {
     }
     if (scope.viharaId == null) {
       setError("Vihara wajib dipilih.");
+      return;
+    }
+    // Nama wajib untuk yang diajukan/diposting (FV-79), bila kategorinya
+    // punya pilihan nama di master. Tanda wajib di pilihan saja tidak cukup:
+    // tombol memanggil fungsi ini langsung, jadi validasi bawaan form tidak
+    // pernah berjalan.
+    if (aksi !== "draft" && !name && names.length > 0) {
+      setError("Nama Penerimaan wajib dipilih.");
       return;
     }
     if (aksi !== "draft" && needRekening) {

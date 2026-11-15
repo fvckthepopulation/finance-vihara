@@ -11,6 +11,7 @@ import { Field, Input, Select } from "@/components/Field";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { PembayaranDetail } from "@/components/PembayaranDetail";
 import { PenerimaanDetail } from "@/components/PenerimaanDetail";
+import { PettyCashDetail } from "@/components/PettyCashDetail";
 import { Toast } from "@/components/Toast";
 import { postPembayaran, rejectPembayaran, STATUS_LABEL, STATUS_TONE, PembayaranStatus } from "@/lib/pembayaran";
 import { postPenerimaan, rejectPenerimaan } from "@/lib/penerimaan";
@@ -24,6 +25,8 @@ import { fmtTanggal } from "@/lib/tanggal";
 import { useAuth } from "@/lib/useAuth";
 import { getMyScope, ScopeVihara } from "@/lib/api";
 import { dialog } from "@/components/Dialog";
+import { listPettyCashPaginated, pettyCashDate, pettyCashKeterangan, pettyCashPicName, PettyCashEntry, postPettyCash } from "@/lib/pettyCash";
+import { num } from "@/lib/kasBank";
 
 // ============================================================================
 // Persetujuan transaksi.
@@ -62,6 +65,7 @@ export default function PersetujuanPage() {
 
   const bisaPengeluaran = can("pembayaran.approve");
   const bisaPenerimaan = can("penerimaan.approve");
+  const bisaKasKecil = can("petty_cash.approve");
 
   const [f, setF] = useState({ ...KOSONG });
   const [rows, setRows] = useState<TransactionRow[]>([]);
@@ -413,6 +417,8 @@ export default function PersetujuanPage() {
         </div>
       </Card>
 
+      {bisaKasKecil && <AntreanKasKecil onToast={setToast} />}
+
       {detail?.tipe === "Pengeluaran" && (
         <PembayaranDetail
           id={detail.id}
@@ -428,5 +434,134 @@ export default function PersetujuanPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+/**
+ * Draft kas kecil yang menunggu persetujuan (FV-81). Mutasi kas kecil tidak
+ * melewati langkah "diajukan": draft dari akun tanpa izin menyetujui memang
+ * berarti menunggu persetujuan, jadi seluruh draft dalam jangkauan penyetuju
+ * tampil di sini — tidak perlu membuka Kas Kecil vihara satu per satu.
+ */
+function AntreanKasKecil({ onToast }: { onToast: (m: string) => void }) {
+  const [rows, setRows] = useState<PettyCashEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    listPettyCashPaginated({ status: "draft", per_page: 100 })
+      .then((r) => {
+        setRows(r.data);
+        setTotal(r.total);
+      })
+      .catch(() => {
+        setRows([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(reload, [reload]);
+
+  async function posting(r: PettyCashEntry) {
+    setBusy(r.id);
+    setError(null);
+    try {
+      await postPettyCash(r.id);
+      onToast(`Mutasi kas kecil #${r.id} disetujui dan diposting`);
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gagal memposting");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card className="mt-3.5" data-testid="antrean-kaskecil">
+      <CardHeader
+        title="Kas Kecil menunggu persetujuan"
+        subtitle={loading ? "Memuat…" : `${total} draft kas kecil`}
+      />
+      {error && (
+        <p className="mx-4 mt-3 rounded-lg border border-km-red bg-km-red-soft px-3 py-2 text-[12px] text-km-red-ink">
+          {error}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px]">
+          <thead className="bg-km-bg">
+            <tr>
+              <Th>Tanggal</Th>
+              <Th>Vihara</Th>
+              <Th>PIC</Th>
+              <Th>Tipe</Th>
+              <Th>Keterangan</Th>
+              <Th className="whitespace-nowrap text-right">Jumlah</Th>
+              <ThAksi />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">Memuat…</td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-km-ink-muted">
+                  Tidak ada draft kas kecil
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.id} className="border-t border-km-border hover:bg-km-panel-soft" data-testid={`antrean-kk-${r.id}`}>
+                  <Td className="whitespace-nowrap">{fmtTanggal(pettyCashDate(r))}</Td>
+                  <Td className="whitespace-nowrap">{r.vihara?.name ?? "—"}</Td>
+                  <Td className="whitespace-nowrap">{pettyCashPicName(r)}</Td>
+                  <Td>{r.subtype === "topup" ? "Pengisian" : "Penggunaan"}</Td>
+                  <Td>
+                    {r.subtype === "topup" ? "Pengisian kas kecil" : (pettyCashKeterangan(r) ?? "—")}
+                    {r.category_label && (
+                      <span className="block text-[11px] text-km-ink-muted">{r.category_label}</span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums font-medium">
+                    {fmtRp(num(r.amount))}
+                  </Td>
+                  <TdAksi>
+                    <Button size="sm" variant="default" onClick={() => setDetailId(r.id)} data-testid={`antrean-kk-detail-${r.id}`}>
+                      Detail
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="success"
+                      disabled={busy === r.id}
+                      onClick={() => posting(r)}
+                      data-testid={`antrean-kk-setujui-${r.id}`}
+                    >
+                      {busy === r.id ? "…" : "Setujui"}
+                    </Button>
+                  </TdAksi>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {detailId != null && (
+        <PettyCashDetail
+          id={detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={(m) => {
+            onToast(m);
+            reload();
+          }}
+        />
+      )}
+    </Card>
   );
 }

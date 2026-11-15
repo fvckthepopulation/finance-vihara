@@ -12,7 +12,7 @@ import { uniq } from "../fixtures/uniq";
 
 type Dibuat = { id: number; code?: string };
 
-const HARI_INI = () => new Date().toISOString().slice(0, 10);
+const HARI_INI = () => new Date().toLocaleDateString("en-CA");
 
 test.describe.configure({ mode: "serial" });
 
@@ -53,6 +53,12 @@ test.describe("v56 kas kecil, jurnal & dashboard", () => {
     expect(Object.keys(tanpa.body.errors ?? {})).toContain("category");
 
     // Kategori Bhikkhu → Dr 5100, bukan 6300 (contoh di Expected poin 2).
+    // Kode lama "bhikkhu" masih diterima dan diterjemahkan ke kode master
+    // (FV-82); Nama Pengeluaran master wajib.
+    const nama = await apiCall<{ data: Array<{ name: string }> }>(
+      admin,
+      `/api/masters/transaction-names?type=pengeluaran&category=biaya_bhikkhu&vihara_id=${viharaVvg}`,
+    );
     const dibuat = await apiCall<Dibuat>(admin, "/api/petty-cash", {
       method: "POST",
       body: JSON.stringify({
@@ -61,8 +67,9 @@ test.describe("v56 kas kecil, jurnal & dashboard", () => {
         subtype: "usage",
         amount: 100000,
         category: "bhikkhu",
+        name: nama.body.data[0].name,
         vihara_id: viharaVvg,
-        description: uniq("v56-bhikkhu"),
+        notes: uniq("v56-bhikkhu"),
       }),
     });
     expect(dibuat.status).toBe(201);
@@ -72,7 +79,7 @@ test.describe("v56 kas kecil, jurnal & dashboard", () => {
       admin,
       `/api/petty-cash/${dibuat.body.id}`,
     );
-    expect(isi.body.category, "kategorinya tersimpan").toBe("bhikkhu");
+    expect(isi.body.category, "kategorinya tersimpan sebagai kode master").toBe("biaya_bhikkhu");
     expect(isi.body.counterpart_account_code, "akun beban mengikuti kategori").toBe("5100");
   });
 

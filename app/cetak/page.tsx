@@ -11,8 +11,8 @@ import { exportCetakExcel, groupCetak } from "@/lib/cetakExcel";
 import { num } from "@/lib/kasBank";
 import { listTransactions, TransactionRow, TransactionTipe } from "@/lib/transactions";
 import { useScopeNames } from "@/lib/useScopeNames";
-import { useVihara } from "@/lib/useVihara";
-import { listViharas, Vihara } from "@/lib/vihara";
+import { getMyScope, ScopeEntity, ScopeVihara } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 const DANA_OPTIONS = ["dana_perayaan", "dana_operasional", "dana_bhikkhu", "dana_paramita"];
 
@@ -141,8 +141,17 @@ export default function CetakPage() {
   const [dana, setDana] = useState("");
   const [tipe, setTipe] = useState<TransactionTipe | "">("");
 
-  const [viharas, setViharas] = useState<Vihara[]>([]);
-  const { viharaId, ready: viharaReady } = useVihara();
+  // Filter Yayasan & Vihara MILIK LAPORAN INI (FV-80), bukan pemilih vihara
+  // di header: pilihan header berlaku untuk tampilan semua menu, jadi
+  // mencetak laporan vihara/yayasan lain tidak boleh memaksa pengguna
+  // mengubah tampilan seluruh aplikasi.
+  const { user } = useAuth();
+  const [entities, setEntities] = useState<ScopeEntity[]>([]);
+  const [viharas, setViharas] = useState<ScopeVihara[]>([]);
+  const [scopeReady, setScopeReady] = useState(false);
+  const [entityId, setEntityId] = useState<number | null>(null);
+  const [viharaId, setViharaId] = useState<number | null>(null);
+  const viharaReady = scopeReady;
   // Nama yayasan dari jangkauan akun, bukan ditulis tetap (FV-65).
   const { yayasan } = useScopeNames();
 
@@ -152,16 +161,39 @@ export default function CetakPage() {
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    listViharas({})
-      .then((r) => setViharas(r.data))
+    getMyScope()
+      .then((d) => {
+        const urut = [...d.entities].sort((a, b) => a.code.localeCompare(b.code));
+        setEntities(urut);
+        setViharas(d.viharas);
+        // Akun satu yayasan: yayasannya terisi dan terkunci. Akun satu
+        // vihara: viharanya juga.
+        if (urut.length === 1) setEntityId(urut[0].id);
+        if (d.viharas.length === 1 && user?.scope_type === "vihara") setViharaId(d.viharas[0].id);
+      })
       .catch(() => {
-        /* user vihara tetap mungkin tak boleh list — org pakai fallback */
-      });
-  }, []);
+        setEntities([]);
+        setViharas([]);
+      })
+      .finally(() => setScopeReady(true));
+  }, [user?.scope_type]);
 
+  const entityLocked = entities.length === 1;
+  const viharaPilihan = useMemo(
+    () =>
+      viharas
+        .filter((v) => entityId == null || v.entity_id === entityId)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [viharas, entityId],
+  );
+  const viharaLocked = user?.scope_type === "vihara" && viharas.length === 1;
+
+  const entity = entityId != null ? entities.find((e) => e.id === entityId) : undefined;
   const vihara = viharaId != null ? viharas.find((v) => v.id === viharaId) : undefined;
-  const org = viharaId == null ? yayasan.name : vihara?.name ?? "";
-  const orgCode = viharaId == null ? yayasan.code : vihara?.code ?? "";
+  // Judul mengikuti filter: vihara → nama vihara; yayasan → nama yayasan;
+  // tanpa keduanya → yayasan dalam jangkauan akun.
+  const org = vihara?.name ?? entity?.legal_name ?? yayasan.name;
+  const orgCode = vihara?.code ?? entity?.code ?? yayasan.code;
 
   // Ambil transaksi posted sesuai filter — paginasi per_page 200, cap 10 hlm/tipe.
   async function fetchRows(): Promise<{ rows: TransactionRow[]; truncated: boolean }> {
@@ -183,6 +215,7 @@ export default function CetakPage() {
           category,
           status: "posted",
           vihara_id: viharaId,
+          entity_id: entityId,
           per_page: 200,
           page,
         });
@@ -257,7 +290,43 @@ export default function CetakPage() {
       <Card>
         <CardHeader title="Cetak / Export Laporan" subtitle="Pilih periode dan jenis laporan" />
         <div className="border-b border-km-border">
-          <FormGrid className="lg:grid-cols-4">
+          <FormGrid className="lg:grid-cols-3">
+            <Field label="Filter Yayasan">
+              <Select
+                value={entityId ?? ""}
+                disabled={entityLocked}
+                data-testid="cetak-yayasan"
+                aria-label="Filter yayasan"
+                onChange={(e) => {
+                  setEntityId(e.target.value ? Number(e.target.value) : null);
+                  // Vihara lama hampir pasti bukan milik yayasan yang baru.
+                  if (!viharaLocked) setViharaId(null);
+                }}
+              >
+                <option value="">Semua yayasan</option>
+                {entities.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.code} — {e.legal_name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Filter Vihara">
+              <Select
+                value={viharaId ?? ""}
+                disabled={viharaLocked}
+                data-testid="cetak-vihara"
+                aria-label="Filter vihara"
+                onChange={(e) => setViharaId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Semua vihara</option>
+                {viharaPilihan.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label="Dari Tanggal">
               <Input
                 type="date"

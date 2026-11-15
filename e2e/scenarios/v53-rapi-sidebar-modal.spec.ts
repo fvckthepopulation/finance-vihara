@@ -185,7 +185,7 @@ test.describe("v53 kerapian sidebar & modal", () => {
       method: "POST",
       body: JSON.stringify({
         entity_id: entityVvg,
-        entry_date: new Date().toISOString().slice(0, 10),
+        entry_date: new Date().toLocaleDateString("en-CA"),
         vihara_id: viharaVvg,
         description: "v53 — jurnal draft untuk uji kolom aksi",
         lines: [

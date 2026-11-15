@@ -52,7 +52,9 @@ const TONE_JURNAL: Record<string, "neutral" | "warn" | "success" | "danger"> = {
 const fmtRp = (n: string | number) =>
   "Rp " + Math.round(typeof n === "string" ? Number(n) : n).toLocaleString("id-ID");
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Tanggal LOKAL (WIB), bukan UTC: toISOString() memberi tanggal kemarin
+// bila form dibuka antara pukul 00.00 dan 07.00.
+const today = () => new Date().toLocaleDateString("en-CA");
 
 type SourceFilter = "" | keyof typeof JOURNAL_SOURCE_LABEL;
 

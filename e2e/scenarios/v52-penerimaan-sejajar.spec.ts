@@ -14,7 +14,7 @@ import { uniq } from "../fixtures/uniq";
 
 type Dibuat = { id: number; code: string; status: string };
 
-const HARI_INI = () => new Date().toISOString().slice(0, 10);
+const HARI_INI = () => new Date().toLocaleDateString("en-CA");
 
 test.describe.configure({ mode: "serial" });
 

@@ -237,7 +237,15 @@ export default function AnggaranPage() {
               }
             />
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full min-w-[720px] table-fixed text-[12px]">
+                {/* Lebar kolom dikunci supaya kolom tidak bergeser saat nominal diketik. */}
+                <colgroup>
+                  <col />
+                  <col className="w-[160px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[170px]" />
+                  <col className="w-[190px]" />
+                </colgroup>
                 <thead className="bg-km-bg">
                   <tr>
                     <Th>Kategori Dana</Th>
@@ -266,7 +274,7 @@ export default function AnggaranPage() {
                                 setPenTargets((m) => ({ ...m, [r.category]: v }));
                                 markDirty(`pen|${r.category}`);
                               }}
-                              className="ml-auto max-w-[130px] text-right"
+                              className="ml-auto w-full max-w-[140px] text-right"
                               aria-label={`Target ${r.label}`}
                             />
                           ) : (
@@ -304,7 +312,15 @@ export default function AnggaranPage() {
           <Card className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
             <CardHeader title="Anggaran Pengeluaran per Kategori Biaya" />
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full min-w-[720px] table-fixed text-[12px]">
+                {/* Lebar kolom dikunci supaya kolom tidak bergeser saat nominal diketik. */}
+                <colgroup>
+                  <col />
+                  <col className="w-[160px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[170px]" />
+                  <col className="w-[190px]" />
+                </colgroup>
                 <thead className="bg-km-bg">
                   <tr>
                     <Th>Kategori Biaya</Th>
@@ -333,7 +349,7 @@ export default function AnggaranPage() {
                                 setPengTargets((m) => ({ ...m, [r.category]: v }));
                                 markDirty(`peng|${r.category}`);
                               }}
-                              className="ml-auto max-w-[130px] text-right"
+                              className="ml-auto w-full max-w-[140px] text-right"
                               aria-label={`Anggaran ${r.label}`}
                             />
                           ) : (
@@ -397,7 +413,15 @@ export default function AnggaranPage() {
               }
             />
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full min-w-[720px] table-fixed text-[12px]">
+                {/* Lebar kolom dikunci supaya kolom tidak bergeser saat nominal diketik. */}
+                <colgroup>
+                  <col />
+                  <col className="w-[170px]" />
+                  <col className="w-[160px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[80px]" />
+                </colgroup>
                 <thead className="bg-km-bg">
                   <tr>
                     <Th>Nama Pengeluaran</Th>
@@ -426,7 +450,7 @@ export default function AnggaranPage() {
                                 );
                                 markDirty(`det|${r.category}|${r.name}`);
                               }}
-                              className="ml-auto max-w-[120px] text-right"
+                              className="ml-auto w-full max-w-[140px] text-right"
                               aria-label={`Anggaran ${r.name}`}
                             />
                           ) : (
