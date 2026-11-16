@@ -1,7 +1,7 @@
 import type { Worksheet } from "exceljs";
 import { num } from "./kasBank";
 import { Isak35Response } from "./laporanKeuangan";
-import { listTransactions, TransactionRow } from "./transactions";
+import { labelSumber, listTransactions, TransactionRow } from "./transactions";
 
 // ============================================================================
 // Export Excel Laporan ISAK 35 — 6 sheet ala mockup exportLaporanXLSX():
@@ -64,7 +64,7 @@ function addDetailSheet(ws: Worksheet, tipe: "Penerimaan" | "Pengeluaran", rows:
         t.name,
         t.category_label || t.category,
         t.method || "",
-        t.source === "km" ? "KM" : "Manual",
+        labelSumber(t.source),
         t.counterparty ?? "",
         num(t.amount),
       ]);
@@ -103,6 +103,10 @@ export async function exportIsak35Excel(opts: ExportIsak35Options): Promise<stri
     to: period.end,
     per_page: 200,
     vihara_id: opts.vihara_id,
+    // Hanya yang terposting — draft belum ada di angka laporan — ditambah
+    // kas kecil & jurnal manual supaya rincian = angka laporan (FV-88/90).
+    status: "posted" as const,
+    laporan: true,
   };
   async function fetchAll(tipe: "Penerimaan" | "Pengeluaran"): Promise<TransactionRow[]> {
     const all: TransactionRow[] = [];

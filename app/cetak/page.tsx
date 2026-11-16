@@ -214,6 +214,8 @@ export default function CetakPage() {
           tipe: t,
           category,
           status: "posted",
+          // Ikut kas kecil & jurnal manual supaya total = buku besar (FV-88).
+          laporan: true,
           vihara_id: viharaId,
           entity_id: entityId,
           per_page: 200,

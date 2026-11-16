@@ -4,6 +4,25 @@ import { api, API_URL, getToken, Paginated } from "./api";
 
 export type TransactionTipe = "Penerimaan" | "Pengeluaran";
 export type TransactionSource = "km" | "manual";
+/**
+ * Asal baris. Dua yang terakhir hanya muncul di mode laporan (FV-88):
+ * pemakaian kas kecil dan jurnal manual ke akun pendapatan/beban.
+ */
+export type TransactionRowSource = TransactionSource | "kas_kecil" | "jurnal_manual";
+
+/** Label kolom Sumber di laporan & Excel. */
+export function labelSumber(source: TransactionRowSource): string {
+  switch (source) {
+    case "km":
+      return "KM";
+    case "kas_kecil":
+      return "Kas Kecil";
+    case "jurnal_manual":
+      return "Jurnal Manual";
+    default:
+      return "Manual";
+  }
+}
 export type TransactionStatus =
   | "draft"
   | "submitted"
@@ -22,7 +41,7 @@ export type TransactionRow = {
   category_label: string;
   amount: number | string;
   method: string;
-  source: TransactionSource;
+  source: TransactionRowSource;
   status: TransactionStatus;
   counterparty: string | null;
   description: string | null;
@@ -43,6 +62,9 @@ export type TransactionRow = {
   submitted_by_user_id?: number | null;
   rejected_at?: string | null;
   reject_reason?: string | null;
+  /** Pembuat & pemosting — terisi untuk baris jurnal manual (FV-88). */
+  created_by?: string | null;
+  posted_by?: string | null;
   /**
    * Referensi eksternal — untuk `source: "km"` berisi ref donasi KalyanaMitta
    * (dipakai link drill-down "KM ↗"). Opsional: backend pra-Phase 7 belum
@@ -75,6 +97,12 @@ export type ListTransactionsParams = {
   entity_id?: number | null;
   /** Saring menurut pengaju (id pengguna). */
   submitted_by?: number | null;
+  /**
+   * Mode laporan (FV-88): ikut memuat pemakaian kas kecil dan jurnal manual
+   * ke akun pendapatan/beban, supaya total sama dengan buku besar. Hanya
+   * berlaku bersama `status: "posted"`.
+   */
+  laporan?: boolean;
   page?: number;
   per_page?: number;
 };
@@ -91,6 +119,7 @@ function buildQuery(params: ListTransactionsParams): URLSearchParams {
   if (params.status) sp.set("status", params.status);
   if (params.vihara_id != null) sp.set("vihara_id", String(params.vihara_id));
   if (params.entity_id != null) sp.set("entity_id", String(params.entity_id));
+  if (params.laporan) sp.set("laporan", "1");
   if (params.page) sp.set("page", String(params.page));
   if (params.per_page) sp.set("per_page", String(params.per_page));
   return sp;

@@ -1,7 +1,7 @@
-import type { Worksheet } from "exceljs";
+import type { Row, Worksheet } from "exceljs";
 import { num } from "./kasBank";
 import { barisKonsolidasi, KonsolidasiEntry, KonsolidasiResponse, multiYayasan } from "./konsolidasi";
-import { listTransactions, TransactionRow } from "./transactions";
+import { labelSumber, listTransactions, TransactionRow } from "./transactions";
 
 // ============================================================================
 // Export Excel Laporan Konsolidasi Yayasan — ala mockup exportKonsolidasi():
@@ -49,7 +49,19 @@ async function fetchViharaTransactions(
   const all: TransactionRow[] = [];
   let page = 1;
   for (;;) {
-    const res = await listTransactions({ vihara_id: viharaId, from, to, per_page: 200, page });
+    // Hanya yang terposting (FV-90): draft, menunggu, ditolak, dan batal
+    // tidak ikut dihitung di konsolidasi, jadi tidak boleh tercantum di
+    // rinciannya. Mode laporan menambah kas kecil & jurnal manual vihara itu
+    // supaya jumlah rincian = angka konsolidasi (FV-88).
+    const res = await listTransactions({
+      vihara_id: viharaId,
+      from,
+      to,
+      status: "posted",
+      laporan: true,
+      per_page: 200,
+      page,
+    });
     all.push(...res.data);
     if (page >= res.last_page || page >= 25) break;
     page += 1;
@@ -66,30 +78,53 @@ function addDetailSheet(ws: Worksheet, rows: TransactionRow[]) {
     { header: "Kategori", width: 20 },
     { header: "Jumlah (Rp)", width: 16 },
     { header: "Metode", width: 14 },
-    { header: "Sumber", width: 10 },
+    { header: "Sumber", width: 14 },
     { header: "Donatur / Penerima", width: 26 },
+    { header: "Dibuat / Diposting", width: 30 },
   ];
   ws.columns = cols.map((c) => ({ width: c.width }));
   const header = ws.addRow(cols.map((c) => c.header));
   header.font = { bold: true };
+  const angka = (r: Row) => {
+    const cell = r.getCell(6);
+    cell.numFmt = FMT;
+    cell.alignment = { horizontal: "right" };
+  };
+  let masuk = 0;
+  let keluar = 0;
   [...rows]
     .sort((a, b) => a.date.localeCompare(b.date))
     .forEach((t) => {
-      const row = ws.addRow([
-        t.date.slice(0, 10),
-        t.tipe,
-        t.code,
-        t.name ?? "",
-        t.category_label || t.category,
-        num(t.amount),
-        t.method || "",
-        t.source === "km" ? "KM" : "Manual",
-        t.counterparty ?? "",
-      ]);
-      const cell = row.getCell(6);
-      cell.numFmt = FMT;
-      cell.alignment = { horizontal: "right" };
+      const n = num(t.amount);
+      if (t.tipe === "Penerimaan") masuk += n;
+      else keluar += n;
+      const jm = t.source === "jurnal_manual";
+      angka(
+        ws.addRow([
+          t.date.slice(0, 10),
+          t.tipe,
+          t.code,
+          t.name ?? "",
+          t.category_label || t.category,
+          n,
+          t.method || "",
+          labelSumber(t.source),
+          jm ? t.description ?? "" : t.counterparty ?? "",
+          jm ? `${t.created_by ?? "?"} / ${t.posted_by ?? "?"}` : "",
+        ]),
+      );
     });
+  // Total masuk & keluar — dicocokkan dengan pendapatan/beban vihara ini di
+  // sheet Penghasilan Komprehensif (FV-90).
+  ws.addRow([]);
+  for (const [label, n] of [
+    ["TOTAL MASUK", masuk],
+    ["TOTAL KELUAR", keluar],
+  ] as const) {
+    const r = ws.addRow(["", "", "", "", label, n]);
+    r.font = { bold: true };
+    angka(r);
+  }
 }
 
 /** Bangun workbook konsolidasi (5 sheet laporan + detail per vihara) lalu unduh. */

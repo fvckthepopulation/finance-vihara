@@ -380,6 +380,19 @@ const SECTIONS: NavSection[] = [
           </svg>
         ),
       },
+      {
+        // Beberapa yayasan dilaporkan bersama, dengan eliminasi (FV-66).
+        href: "/admin/grup-konsolidasi",
+        label: "Grup Konsolidasi",
+        permission: "entities.manage",
+        icon: (
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="1.5" y="3" width="5" height="10" rx="1" />
+            <rect x="9.5" y="3" width="5" height="10" rx="1" />
+            <path d="M6.5 8h3" />
+          </svg>
+        ),
+      },
     ],
   },
 ];

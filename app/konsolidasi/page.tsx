@@ -26,6 +26,13 @@ import {
   viharaColor,
 } from "@/lib/konsolidasi";
 import { exportKonsolidasiExcel } from "@/lib/konsolidasiExcel";
+import {
+  getKonsolidasiGrup,
+  GrupKonsolidasi,
+  KonsolidasiGrupResponse,
+  listGrup,
+} from "@/lib/konsolidasiGrup";
+import { KonsolidasiGrupView } from "@/components/KonsolidasiGrupView";
 import { useScopeNames } from "@/lib/useScopeNames";
 import { Isak35Mode, isak35PeriodLabel, MONTHS_ID } from "@/lib/laporanKeuangan";
 
@@ -68,6 +75,35 @@ export default function KonsolidasiPage() {
   const { yayasan } = useScopeNames();
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  // Grup Konsolidasi (FV-66): bila dipilih, laporan grup menggantikan
+  // laporan per yayasan.
+  const [grupList, setGrupList] = useState<GrupKonsolidasi[]>([]);
+  const [grupId, setGrupId] = useState<number | null>(null);
+  const [grupData, setGrupData] = useState<KonsolidasiGrupResponse | null>(null);
+  const [grupLoading, setGrupLoading] = useState(false);
+
+  useEffect(() => {
+    listGrup()
+      .then((r) => setGrupList(r.data))
+      .catch(() => setGrupList([]));
+  }, []);
+
+  useEffect(() => {
+    if (grupId == null) {
+      setGrupData(null);
+      return;
+    }
+    let alive = true;
+    setGrupLoading(true);
+    setError(null);
+    getKonsolidasiGrup({ groupId: grupId, mode, year, month })
+      .then((d) => alive && setGrupData(d))
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "Gagal memuat laporan grup"))
+      .finally(() => alive && setGrupLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [grupId, mode, year, month]);
 
   useEffect(() => {
     let alive = true;
@@ -114,18 +150,33 @@ export default function KonsolidasiPage() {
   const periodSelector = (
     <div className="flex items-center gap-1.5">
       {/* Pilihan yayasan hanya untuk akun yang menjangkau lebih dari satu yayasan. */}
-      {pilihanYayasan.length > 1 && (
+      {(pilihanYayasan.length > 1 || grupList.length > 0) && (
         <TopbarSelect
-          value={entityId ?? ""}
-          onChange={(e) => setEntityId(e.target.value === "" ? null : Number(e.target.value))}
+          value={grupId != null ? `g:${grupId}` : entityId ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v.startsWith("g:")) {
+              setGrupId(Number(v.slice(2)));
+              return;
+            }
+            setGrupId(null);
+            setEntityId(v === "" ? null : Number(v));
+          }}
           className="max-w-[220px]"
-          aria-label="Yayasan"
+          aria-label="Yayasan atau grup"
           data-testid="konsol-yayasan"
         >
           <option value="">Semua yayasan</option>
           {pilihanYayasan.map((y) => (
             <option key={y.id} value={y.id}>{y.code} — {y.nama}</option>
           ))}
+          {grupList.length > 0 && (
+            <optgroup label="Grup Konsolidasi">
+              {grupList.map((g) => (
+                <option key={`g${g.id}`} value={`g:${g.id}`}>Grup: {g.name}</option>
+              ))}
+            </optgroup>
+          )}
         </TopbarSelect>
       )}
       <TopbarSelect
@@ -200,6 +251,25 @@ export default function KonsolidasiPage() {
             </p>
           )}
 
+          {grupId != null ? (
+            grupData ? (
+              <KonsolidasiGrupView
+                data={grupData}
+                periodeLabel={periodeLabel}
+                loading={grupLoading}
+                onToast={(t) => {
+                  setToast(t);
+                  setTimeout(() => setToast(null), 4000);
+                }}
+              />
+            ) : (
+              <Card>
+                <p className="px-4 py-12 text-center text-[12px] text-km-ink-muted">
+                  {grupLoading ? "Memuat laporan grup konsolidasi…" : "Laporan grup belum tersedia."}
+                </p>
+              </Card>
+            )
+          ) : (
           <Card className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
             <CardHeader
               title={`Laporan Konsolidasi — ${data?.yayasan.nama ?? yayasan.name}`}
@@ -278,6 +348,7 @@ export default function KonsolidasiPage() {
               </>
             )}
           </Card>
+          )}
         </>
       )}
 

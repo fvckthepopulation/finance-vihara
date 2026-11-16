@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
 import { Modal } from "@/components/Modal";
-import { api } from "@/lib/api";
+import { api, getMyScope, ScopeVihara } from "@/lib/api";
 import { bankBrand, listViharaBankAccounts, ViharaBankAccount } from "@/lib/kasBank";
 
 // ============================================================================
@@ -29,11 +29,17 @@ export function TransferRekeningForm({
   onClose,
   onSelesai,
 }: {
-  /** Vihara yang sedang dipilih di header; boleh null (tingkat yayasan). */
+  /**
+   * Vihara yang sedang dipilih di header. Null = "Semua Vihara": vihara
+   * transfer lalu dipilih di form, karena tidak ada lagi transaksi tanpa
+   * vihara (FV-64) — transfer pusat yayasan memakai unit Umum/Pusat Yayasan.
+   */
   viharaId: number | null;
   onClose: () => void;
   onSelesai: (pesan: string) => void;
 }) {
+  const [vihara, setVihara] = useState<number | null>(viharaId);
+  const [pilihanVihara, setPilihanVihara] = useState<ScopeVihara[]>([]);
   const [rekening, setRekening] = useState<ViharaBankAccount[]>([]);
   const [dari, setDari] = useState("");
   const [ke, setKe] = useState("");
@@ -44,14 +50,25 @@ export function TransferRekeningForm({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (viharaId != null) return;
     let alive = true;
-    listViharaBankAccounts(viharaId, "bank")
+    getMyScope()
+      .then((d) => alive && setPilihanVihara([...d.viharas].sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => alive && setPilihanVihara([]));
+    return () => {
+      alive = false;
+    };
+  }, [viharaId]);
+
+  useEffect(() => {
+    let alive = true;
+    listViharaBankAccounts(vihara, "bank")
       .then((list) => alive && setRekening(list.filter((b) => b.active)))
       .catch(() => alive && setRekening([]));
     return () => {
       alive = false;
     };
-  }, [viharaId]);
+  }, [vihara]);
 
   const label = (b: ViharaBankAccount) =>
     `${bankBrand(b.bank_name)} — ${b.account_number ?? "—"}` +
@@ -69,7 +86,7 @@ export function TransferRekeningForm({
           to_bank_account_id: Number(ke),
           date,
           amount,
-          vihara_id: viharaId ?? undefined,
+          vihara_id: vihara ?? undefined,
           description: catatan || undefined,
         }),
       });
@@ -95,7 +112,7 @@ export function TransferRekeningForm({
           <Button
             type="submit"
             variant="primary"
-            disabled={pending || !dari || !ke || amount <= 0}
+            disabled={pending || vihara == null || !dari || !ke || amount <= 0}
             data-testid="simpan-transfer"
           >
             {pending ? "Menyimpan…" : "Catat Transfer"}
@@ -113,6 +130,28 @@ export function TransferRekeningForm({
           Memindahkan dana antar rekening milik yayasan yang sama. Tidak dicatat sebagai
           penerimaan maupun pengeluaran, dan tidak mengubah pembatasan dana.
         </p>
+        {viharaId == null && (
+          <Field label="Vihara *">
+            <Select
+              required
+              data-testid="transfer-vihara"
+              value={vihara ?? ""}
+              onChange={(e) => {
+                setVihara(e.target.value ? Number(e.target.value) : null);
+                // Rekening yang boleh dipakai bergantung pada viharanya.
+                setDari("");
+                setKe("");
+              }}
+            >
+              <option value="">— Pilih vihara (pusat yayasan: unit Umum/Pusat) —</option>
+              {pilihanVihara.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label="Dari rekening *">
           <Select
             required

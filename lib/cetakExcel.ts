@@ -1,6 +1,6 @@
 import type { Worksheet } from "exceljs";
 import { num } from "./kasBank";
-import { TransactionRow } from "./transactions";
+import { labelSumber, TransactionRow } from "./transactions";
 
 // ============================================================================
 // Export Excel Laporan Penerimaan Dana (/cetak) — 2 sheet ala mockup
@@ -20,7 +20,27 @@ export type CetakGroup = {
 
 /** Nama transaksi untuk agregasi — API bisa mengirim name null (fallback deskripsi/kode). */
 export function txName(t: TransactionRow): string {
+  // Jurnal manual tidak dijumlahkan per nama: tiap jurnal tampil sendiri
+  // lengkap dengan pembuat & pemosting, supaya jurnal yang dibuat dan
+  // diposting satu orang mudah terlihat pengurus (FV-88).
+  if (t.source === "jurnal_manual") {
+    return [
+      t.code,
+      t.date.slice(0, 10),
+      t.description || "",
+      t.name || "",
+      `dibuat ${t.created_by ?? "?"}, diposting ${t.posted_by ?? "?"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   return t.name || t.description || t.code || "(tanpa nama)";
+}
+
+/** "Pembuat / Pemosting" — hanya untuk baris jurnal manual. */
+export function pembuatPemosting(t: TransactionRow): string {
+  if (t.source !== "jurnal_manual") return "";
+  return `${t.created_by ?? "?"} / ${t.posted_by ?? "?"}`;
 }
 
 /** Kelompokkan transaksi per kategori → per nama (agregat), urut nominal desc. */
@@ -117,6 +137,7 @@ export async function exportCetakExcel(opts: {
     { header: "Metode", width: 14 },
     { header: "Sumber", width: 10 },
     { header: "Donatur / Penerima", width: 26 },
+    { header: "Dibuat / Diposting", width: 30 },
     { header: "Jumlah (Rp)", width: 16 },
   ];
   ws2.columns = cols.map((c) => ({ width: c.width }));
@@ -131,19 +152,20 @@ export async function exportCetakExcel(opts: {
         t.name ?? "",
         t.category_label || t.category,
         t.method || "",
-        t.source === "km" ? "KM" : "Manual",
-        t.counterparty ?? "",
+        labelSumber(t.source),
+        t.source === "jurnal_manual" ? t.description ?? "" : t.counterparty ?? "",
+        pembuatPemosting(t),
         num(t.amount),
       ]);
-      numCell(ws2, r.number, 9);
+      numCell(ws2, r.number, 10);
     });
   ws2.addRow([]);
-  const rm = ws2.addRow(["", "", "", "", "", "", "", "TOTAL MASUK", totalMasuk]);
+  const rm = ws2.addRow(["", "", "", "", "", "", "", "", "TOTAL MASUK", totalMasuk]);
   rm.font = { bold: true };
-  numCell(ws2, rm.number, 9);
-  const rk = ws2.addRow(["", "", "", "", "", "", "", "TOTAL KELUAR", totalKeluar]);
+  numCell(ws2, rm.number, 10);
+  const rk = ws2.addRow(["", "", "", "", "", "", "", "", "TOTAL KELUAR", totalKeluar]);
   rk.font = { bold: true };
-  numCell(ws2, rk.number, 9);
+  numCell(ws2, rk.number, 10);
 
   const filename = `Laporan_${orgCode}_${dari}_sd_${sampai}.xlsx`;
   const buf = await wb.xlsx.writeBuffer();
