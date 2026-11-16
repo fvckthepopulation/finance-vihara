@@ -56,7 +56,7 @@ test.describe("v57 kas kecil lanjutan", () => {
     await form.getByTestId("penggunaan-catatan").fill(catatan);
     await form.getByTestId("penggunaan-lampiran").setInputFiles({ name: "nota.png", mimeType: "image/png", buffer: PNG });
     await form.getByRole("button", { name: "Catat Penggunaan" }).click();
-    await expect(page.getByText("menunggu persetujuan").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Tersimpan sebagai draft").first()).toBeVisible({ timeout: 10_000 });
 
     const baris = page.locator("tbody tr", { hasText: "Biaya Makan Bhikkhu" }).filter({ hasText: "Draft" }).first();
     await expect(baris).toBeVisible({ timeout: 10_000 });
@@ -74,11 +74,19 @@ test.describe("v57 kas kecil lanjutan", () => {
     await expect(baris).toBeVisible({ timeout: 10_000 });
 
     await baris.getByRole("button", { name: "Ubah" }).click();
-    const modal = page.getByTestId("ubah-kaskecil");
+    // Draft dilanjutkan di form input yang sama dengan saat menambahkan,
+    // bukan di modal (seperti Input Pengeluaran).
+    await expect(page.getByTestId("ubah-kaskecil")).toHaveCount(0);
+    const modal = page.getByTestId("form-ubah-penggunaan");
     await expect(modal).toBeVisible();
+    await expect(modal.getByText(/Ubah Draft Penggunaan Kas Kecil #\d+/)).toBeVisible();
+    await expect(page.getByTestId("form-penggunaan")).toHaveCount(0);
     await expect(modal.getByTestId("kaskecil-nama")).toHaveValue("Biaya Makan Bhikkhu");
+    await expect(modal.getByTestId("penggunaan-catatan")).toHaveValue(catatan);
     await modal.getByLabel("Jumlah (Rp)").fill("43000");
     await modal.getByRole("button", { name: "Simpan Perubahan" }).click();
+    // Setelah disimpan form kembali menjadi form tambah baru yang kosong.
+    await expect(page.getByTestId("form-penggunaan")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Draft kas kecil diperbarui")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("tbody tr").filter({ hasText: "43.000" }).first()).toBeVisible({ timeout: 10_000 });
 

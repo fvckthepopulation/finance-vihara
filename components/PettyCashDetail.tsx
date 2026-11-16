@@ -42,7 +42,7 @@ const fmtWaktu = (iso: string | null | undefined) => {
 };
 
 const STATUS: Record<string, string> = {
-  draft: "Draft — menunggu persetujuan",
+  draft: "Draft",
   posted: "Terposting",
   cancelled: "Dibatalkan",
 };

@@ -6,7 +6,6 @@ import { Td, TdAksi, Th, ThAksi } from "@/components/Tabel";
 import { Button } from "@/components/Button";
 import { Card, CardHeader } from "@/components/Card";
 import { Field, Input, MoneyInput, Select, Textarea } from "@/components/Field";
-import { Modal } from "@/components/Modal";
 import { Pagination, PER_PAGE_DEFAULT } from "@/components/Pagination";
 import { PettyCashDetail } from "@/components/PettyCashDetail";
 import { Toast } from "@/components/Toast";
@@ -99,7 +98,7 @@ async function simpanMutasi(opsi: {
       tone: "success",
     };
   }
-  return { pesan: "Tersimpan sebagai draft — menunggu persetujuan", tone: "success" };
+  return { pesan: "Tersimpan sebagai draft", tone: "success" };
 }
 
 export default function PettyCashPage() {
@@ -131,7 +130,22 @@ export default function PettyCashPage() {
   const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const [toast, setToast] = useState<ToastMsg | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  // Draft yang sedang diubah. Seperti Input Pengeluaran (FV-46), draft
+  // dilanjutkan di FORM INPUT yang sama dengan saat menambahkannya, bukan di
+  // modal tersendiri — supaya isian dan pemeriksaannya persis sama.
   const [ubah, setUbah] = useState<PettyCashEntry | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  function mulaiUbah(r: PettyCashEntry) {
+    const rv = r as PettyCashEntry & { vihara_id?: number | null; entity_id?: number | null };
+    const v = r.vihara?.id ?? rv.vihara_id ?? null;
+    const e = r.entity?.id ?? rv.entity_id ?? null;
+    // Form mengikuti vihara draft-nya: PIC & rekening yang dipilih harus
+    // milik vihara itu.
+    if (v != null && v !== scope.viharaId) setScope({ entityId: e ?? scope.entityId, viharaId: v });
+    setUbah(r);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   // Rentang terbalik tidak dikirim ke server — pesannya tampil di sini.
   const rentangSalah = dari !== "" && sampai !== "" && sampai < dari;
@@ -272,6 +286,9 @@ export default function PettyCashPage() {
     reloadRows();
   }
 
+  const ubahTopup = ubah?.subtype === "topup";
+  const ubahUsage = ubah != null && !ubahTopup;
+
   const formProps = {
     pics,
     viharaId,
@@ -289,7 +306,14 @@ export default function PettyCashPage() {
         {/* ── Vihara yang sedang dikelola ── */}
         <Card>
           <div className="grid grid-cols-1 gap-2.5 px-4 py-3.5 sm:grid-cols-2">
-            <YayasanViharaFields value={scope} onChange={setScope} />
+            <YayasanViharaFields
+              value={scope}
+              onChange={(v) => {
+                setScope(v);
+                // Ganti vihara = tinggalkan draft yang sedang diubah.
+                if (v.viharaId !== scope.viharaId) setUbah(null);
+              }}
+            />
           </div>
           {needVihara && (
             <p className="border-t border-km-border bg-km-panel-soft px-4 py-2 text-[11px] font-medium text-km-amber-ink">
@@ -353,12 +377,35 @@ export default function PettyCashPage() {
         </div>
 
         {/* ── Form pengisian & penggunaan ── */}
-        <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-          <Card>
-            <TopupForm {...formProps} bankAccounts={bankAccounts} title="Pengisian Kas Kecil" />
+        <div ref={formRef} className="grid scroll-mt-24 grid-cols-1 gap-3.5 lg:grid-cols-2">
+          <Card className={ubahTopup ? "ring-2 ring-km-amber" : ""}>
+            <TopupForm
+              // Ganti key → form dipasang ulang dengan isian draft (atau kosong).
+              key={ubahTopup ? `ubah-${ubah!.id}` : "baru"}
+              {...formProps}
+              bankAccounts={bankAccounts}
+              title={ubahTopup ? `Ubah Draft Pengisian Kas Kecil #${ubah!.id}` : "Pengisian Kas Kecil"}
+              initial={ubahTopup ? ubah! : undefined}
+              onSaved={(m, tone) => {
+                if (ubahTopup) setUbah(null);
+                afterSaved(m, tone);
+              }}
+              onCancel={ubahTopup ? () => setUbah(null) : undefined}
+            />
           </Card>
-          <Card>
-            <UsageForm {...formProps} kategori={kategori} title="Penggunaan Kas Kecil" />
+          <Card className={ubahUsage ? "ring-2 ring-km-amber" : ""}>
+            <UsageForm
+              key={ubahUsage ? `ubah-${ubah!.id}` : "baru"}
+              {...formProps}
+              kategori={kategori}
+              title={ubahUsage ? `Ubah Draft Penggunaan Kas Kecil #${ubah!.id}` : "Penggunaan Kas Kecil"}
+              initial={ubahUsage ? ubah! : undefined}
+              onSaved={(m, tone) => {
+                if (ubahUsage) setUbah(null);
+                afterSaved(m, tone);
+              }}
+              onCancel={ubahUsage ? () => setUbah(null) : undefined}
+            />
           </Card>
         </div>
 
@@ -525,7 +572,7 @@ export default function PettyCashPage() {
                             {draft && bisaCatat && (
                               <button
                                 type="button"
-                                onClick={() => setUbah(r)}
+                                onClick={() => mulaiUbah(r)}
                                 data-testid={`ubah-kaskecil-${r.id}`}
                                 className="whitespace-nowrap text-[11px] text-km-ink hover:underline"
                               >
@@ -616,46 +663,10 @@ export default function PettyCashPage() {
           id={detailId}
           onClose={() => setDetailId(null)}
           onChanged={(m) => afterSaved(m)}
-          onUbah={(row) => setUbah(row)}
+          onUbah={(row) => mulaiUbah(row)}
         />
       )}
 
-      {ubah && (
-        <Modal
-          title={`Ubah draft kas kecil #${ubah.id}`}
-          onClose={() => setUbah(null)}
-          width="max-w-lg"
-          testId="ubah-kaskecil"
-        >
-          {ubah.subtype === "topup" ? (
-            <TopupForm
-              {...formProps}
-              viharaId={ubah.vihara?.id ?? (ubah as { vihara_id?: number }).vihara_id ?? viharaId}
-              needVihara={false}
-              bankAccounts={bankAccounts}
-              initial={ubah}
-              onSaved={(m, tone) => {
-                setUbah(null);
-                afterSaved(m, tone);
-              }}
-              onCancel={() => setUbah(null)}
-            />
-          ) : (
-            <UsageForm
-              {...formProps}
-              viharaId={ubah.vihara?.id ?? (ubah as { vihara_id?: number }).vihara_id ?? viharaId}
-              needVihara={false}
-              kategori={kategori}
-              initial={ubah}
-              onSaved={(m, tone) => {
-                setUbah(null);
-                afterSaved(m, tone);
-              }}
-              onCancel={() => setUbah(null)}
-            />
-          )}
-        </Modal>
-      )}
     </AppShell>
   );
 }
