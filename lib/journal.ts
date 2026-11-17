@@ -95,6 +95,8 @@ export const listJournalEntries = (params: {
   q?: string;
   from?: string;
   to?: string;
+  /** Jurnal yang punya baris di akun COA ini. */
+  account_code?: string;
   page?: number;
   per_page?: number;
 } = {}) => {
@@ -102,9 +104,19 @@ export const listJournalEntries = (params: {
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== "" && v !== null) sp.set(k, String(v));
   });
-  return api<Paginated<JournalEntryRow>>(
+  return api<Paginated<JournalEntryRow> & { ringkasan_akun: RingkasanAkun | null }>(
     `/api/journal-entries${sp.toString() ? `?${sp}` : ""}`,
   );
+};
+
+/** Mutasi akun yang difilter, dari jurnal terposting di seluruh hasil saringan. */
+export type RingkasanAkun = {
+  account_code: string;
+  name: string | null;
+  debit: string;
+  kredit: string;
+  /** Debit − kredit. */
+  saldo: string;
 };
 
 export const getJournalEntry = (id: number | string) =>
@@ -157,6 +169,7 @@ export async function unduhJurnalExcel(params: {
   to?: string;
   q?: string;
   vihara_id?: number | null;
+  account_code?: string;
 }): Promise<{ blob: Blob; filename: string }> {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {

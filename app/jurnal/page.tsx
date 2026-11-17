@@ -23,6 +23,7 @@ import {
   journalSourceLabel,
   listJournalEntries,
   postJournalEntry,
+  RingkasanAkun,
   updateJournalEntry,
   unduhJurnalExcel,
 } from "@/lib/journal";
@@ -81,6 +82,7 @@ export default function JurnalPage() {
         from: from || undefined,
         to: to || undefined,
         q: q || undefined,
+        account_code: akun || undefined,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -103,6 +105,9 @@ export default function JurnalPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [q, setQ] = useState("");
+  // Filter akun COA: jurnal yang punya baris di akun ini.
+  const [akun, setAkun] = useState("");
+  const [ringkasanAkun, setRingkasanAkun] = useState<RingkasanAkun | null>(null);
   const [accounts, setAccounts] = useState<CoaAccount[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [viewId, setViewId] = useState<number | null>(null);
@@ -124,11 +129,13 @@ export default function JurnalPage() {
       from: from || undefined,
       to: to || undefined,
       q: q || undefined,
+      account_code: akun || undefined,
       page,
       per_page: perPage,
     })
       .then((p) => {
         setRows(p.data);
+        setRingkasanAkun(p.ringkasan_akun ?? null);
         setMeta({
           current_page: p.current_page,
           last_page: p.last_page,
@@ -141,15 +148,24 @@ export default function JurnalPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(reload, [source, status, from, to, q, page, perPage]);
+  useEffect(reload, [source, status, from, to, q, akun, page, perPage]);
 
   // Saringan atau kata kunci berubah → kembali ke halaman 1.
   useEffect(() => {
     setPage(1);
-  }, [source, status, from, to, q, perPage]);
+  }, [source, status, from, to, q, akun, perPage]);
+
+  // Pilihan filter akun: akun yang bisa diposting (bukan header), termasuk
+  // yang sudah nonaktif — jurnal lamanya tetap perlu bisa dicari.
+  const pilihanAkun = useMemo(
+    () => accounts.filter((a) => !a.is_header).sort((a, b) => a.code.localeCompare(b.code)),
+    [accounts],
+  );
 
   useEffect(() => {
-    listCoa({ active: true }).then(setAccounts).catch(() => {});
+    // Semua akun: form JE menyaring yang aktif sendiri, filter akun butuh
+    // yang nonaktif juga.
+    listCoa().then(setAccounts).catch(() => {});
   }, []);
 
   async function handleVoid(r: { id: number }) {
@@ -240,6 +256,21 @@ export default function JurnalPage() {
             <option value="draft">Draft</option>
             <option value="posted">Posted</option>
           </Select>
+          <Select
+            value={akun}
+            onChange={(e) => setAkun(e.target.value)}
+            className="min-w-48 max-w-xs"
+            aria-label="Filter akun COA"
+            data-testid="filter-akun"
+          >
+            <option value="">Semua akun</option>
+            {pilihanAkun.map((a) => (
+              <option key={a.code} value={a.code}>
+                {a.code} — {a.name}
+                {a.active ? "" : " (nonaktif)"}
+              </option>
+            ))}
+          </Select>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="min-w-36" />
           <span className="text-[11px] text-km-ink-muted">s/d</span>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="min-w-36" />
@@ -256,6 +287,22 @@ export default function JurnalPage() {
             {loading ? "Memuat…" : `${meta.total} entry`}
           </p>
         </div>
+        {akun && ringkasanAkun && (
+          <div
+            className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-km-border bg-km-blue-soft px-4 py-2 text-[12px] text-km-blue-ink"
+            data-testid="ringkasan-akun"
+          >
+            <span className="font-semibold">
+              {ringkasanAkun.account_code} — {ringkasanAkun.name ?? ""}
+            </span>
+            <span>Debit {fmtRp(ringkasanAkun.debit)}</span>
+            <span>Kredit {fmtRp(ringkasanAkun.kredit)}</span>
+            <span className="font-semibold">Saldo (Dr − Kr) {fmtRp(ringkasanAkun.saldo)}</span>
+            <span className="text-[11px] opacity-80">
+              Dari jurnal terposting sesuai saringan; jurnal ditampilkan utuh beserta akun lawannya.
+            </span>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
