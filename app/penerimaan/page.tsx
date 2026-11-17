@@ -365,6 +365,7 @@ function IsiPenerimaan() {
               onChange={setScope}
               disabled={pending !== null || draftId != null || memuatDraft}
             />
+            {/* Urutan: kapan & dari siapa → dana apa → lewat mana → berapa & buktinya. */}
             <Field label="Tanggal *">
               <Input
                 type="date"
@@ -373,8 +374,19 @@ function IsiPenerimaan() {
                 onChange={(e) => setDate(e.target.value)}
               />
             </Field>
-            <Field label="Jumlah (Rp) *">
-              <MoneyInput value={amount} onChange={setAmount} />
+            <Field
+              label="Donatur / Sumber"
+              hint="Ketik untuk melihat saran dari master; nama baru tetap boleh diisi bebas."
+            >
+              <PenerimaInput
+                value={donatur}
+                payeeId={donaturId}
+                onChange={(nama, id) => {
+                  setDonatur(nama);
+                  setDonaturId(id);
+                }}
+                onError={setError}
+              />
             </Field>
             <Field label="Kategori Dana *">
               <Select
@@ -456,19 +468,8 @@ function IsiPenerimaan() {
                 <Input value="Kas Penerimaan Langsung" disabled readOnly />
               </Field>
             )}
-            <Field
-              label="Donatur / Sumber"
-              hint="Ketik untuk melihat saran dari master; nama baru tetap boleh diisi bebas."
-            >
-              <PenerimaInput
-                value={donatur}
-                payeeId={donaturId}
-                onChange={(nama, id) => {
-                  setDonatur(nama);
-                  setDonaturId(id);
-                }}
-                onError={setError}
-              />
+            <Field label="Jumlah (Rp) *">
+              <MoneyInput value={amount} onChange={setAmount} />
             </Field>
             <Field label="No. Bukti / Referensi">
               <Input
